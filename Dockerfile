@@ -4,7 +4,8 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIPENV_VENV_IN_PROJECT=1
+    PIPENV_VENV_IN_PROJECT=1 \
+    PIPENV_IGNORE_VIRTUALENVS=1
 
 # Set working directory
 WORKDIR /app
@@ -15,10 +16,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Install pipenv
+RUN pip install --no-cache-dir pipenv
+
+# Copy dependency files
 COPY Pipfile Pipfile.lock ./
-RUN pip install --no-cache-dir pipenv && \
-    pipenv install --deploy --system
+
+# Install dependencies
+RUN pipenv install --system --deploy && \
+    pipenv --clear
 
 # Copy project files
 COPY . .

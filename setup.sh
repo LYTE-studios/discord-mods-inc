@@ -90,8 +90,9 @@ fi
 # Initialize pipenv and install dependencies
 export PIPENV_VENV_IN_PROJECT=1  # Keep virtualenv in project directory
 pipenv --python 3
-pipenv install
-pipenv install --dev
+pipenv lock  # Generate new Pipfile.lock
+pipenv install --deploy  # Install from Pipfile.lock
+pipenv install --dev --deploy  # Install dev dependencies from Pipfile.lock
 
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
