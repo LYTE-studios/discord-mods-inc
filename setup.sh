@@ -8,16 +8,87 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}Setting up Discord Mods Inc...${NC}\n"
 
-# Check if Docker is installed
+# Function to check if we're running on Ubuntu/Debian
+is_ubuntu_debian() {
+    [ -f "/etc/debian_version" ]
+}
+
+# Function to check if we're running on RHEL/CentOS/Fedora
+is_rhel_based() {
+    [ -f "/etc/redhat-release" ]
+}
+
+# Function to install Docker on Ubuntu/Debian
+install_docker_ubuntu() {
+    echo -e "${YELLOW}Installing Docker...${NC}"
+    sudo apt-get update
+    sudo apt-get install -y ca-certificates curl gnupg
+    sudo install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    sudo chmod a+r /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    sudo apt-get update
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    sudo usermod -aG docker $USER
+    echo -e "${GREEN}Docker installed successfully!${NC}"
+}
+
+# Function to install Docker on RHEL/CentOS/Fedora
+install_docker_rhel() {
+    echo -e "${YELLOW}Installing Docker...${NC}"
+    sudo dnf -y install dnf-plugins-core
+    sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+    sudo dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    sudo systemctl start docker
+    sudo systemctl enable docker
+    sudo usermod -aG docker $USER
+    echo -e "${GREEN}Docker installed successfully!${NC}"
+}
+
+# Function to install Docker Compose
+install_docker_compose() {
+    echo -e "${YELLOW}Installing Docker Compose...${NC}"
+    COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d'"' -f4)
+    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
+    echo -e "${GREEN}Docker Compose installed successfully!${NC}"
+}
+
+# Check and install Docker if needed
 if ! command -v docker &> /dev/null; then
-    echo -e "${RED}Docker is not installed. Please install Docker first.${NC}"
-    exit 1
+    if is_ubuntu_debian; then
+        install_docker_ubuntu
+    elif is_rhel_based; then
+        install_docker_rhel
+    else
+        echo -e "${RED}Unsupported operating system. Please install Docker manually.${NC}"
+        exit 1
+    fi
 fi
 
-# Check if Docker Compose is installed
+# Check and install Docker Compose if needed
 if ! command -v docker-compose &> /dev/null; then
-    echo -e "${RED}Docker Compose is not installed. Please install Docker Compose first.${NC}"
-    exit 1
+    install_docker_compose
+fi
+
+# Install Python dependencies if needed
+if is_ubuntu_debian; then
+    echo -e "${YELLOW}Installing Python dependencies...${NC}"
+    sudo apt-get update
+    sudo apt-get install -y python3 python3-pip python3-venv
+elif is_rhel_based; then
+    echo -e "${YELLOW}Installing Python dependencies...${NC}"
+    sudo dnf install -y python3 python3-pip python3-virtualenv
+fi
+
+# Create virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+    echo -e "${YELLOW}Creating Python virtual environment...${NC}"
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install --upgrade pip
+    pip install -r requirements.txt
+    pip install -r requirements-dev.txt
 fi
 
 # Create .env file if it doesn't exist
@@ -49,6 +120,11 @@ if [ $? -eq 0 ]; then
     echo -e "2. Run ${YELLOW}docker-compose logs -f${NC} to view the logs"
     echo -e "3. Visit ${YELLOW}http://localhost:5000${NC} to check the application"
     echo -e "\nTo stop the application, run: ${YELLOW}docker-compose down${NC}"
+    
+    # Notify about Docker group
+    if [ -n "$(groups | grep docker)" ]; then
+        echo -e "\n${YELLOW}Note: You've been added to the docker group. Please log out and back in for this to take effect.${NC}"
+    fi
 else
     echo -e "\n${RED}Setup failed. Please check the error messages above.${NC}"
     exit 1
