@@ -1,30 +1,34 @@
-# Use Python 3.11 slim image as base
+# Use Python 3.11 slim image
 FROM python:3.11-slim
-
-# Set working directory
-WORKDIR /app
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PIPENV_VENV_IN_PROJECT=1
+
+# Set working directory
+WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    python3-dev \
+    build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY Pipfile Pipfile.lock ./
+RUN pip install --no-cache-dir pipenv && \
+    pipenv install --deploy --system
 
 # Copy project files
 COPY . .
 
-# Create non-root user
-RUN useradd -m appuser && chown -R appuser:appuser /app
-USER appuser
+# Create necessary directories
+RUN mkdir -p logs data
+
+# Set proper permissions
+RUN chmod +x setup.sh && \
+    chmod 600 .env.example
 
 # Run the application
 CMD ["python", "main.py"]

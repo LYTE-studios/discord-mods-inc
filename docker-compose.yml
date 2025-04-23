@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build: .
@@ -9,8 +7,10 @@ services:
       - .:/app
     restart: unless-stopped
     depends_on:
-      - redis
-      - supabase
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   redis:
     image: redis:alpine
@@ -20,17 +20,29 @@ services:
     volumes:
       - redis_data:/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  supabase:
-    image: supabase/postgres
-    container_name: discord-mods-supabase
+  postgres:
+    build: ./postgres
+    container_name: discord-mods-postgres
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD:-your-password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your-password}
       POSTGRES_DB: discord_mods
+      POSTGRES_USER: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 volumes:

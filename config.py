@@ -10,7 +10,12 @@ class Settings(BaseSettings):
     DISCORD_TOKEN: str = os.getenv("DISCORD_TOKEN", "")
     DISCORD_GUILD_ID: int = int(os.getenv("DISCORD_GUILD_ID", "0"))
     
-    # Supabase Configuration
+    # Database Configuration
+    POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "")
+    POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "discord_mods")
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "")
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
     

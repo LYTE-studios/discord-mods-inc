@@ -8,7 +8,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -24,31 +23,49 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# Virtual environment
+MANIFEST
+.env
+.venv
 venv/
 ENV/
-.env
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-.DS_Store
+*~
 
 # Testing
-.pytest_cache/
 .coverage
-htmlcov/
+.coverage.*
 coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+htmlcov/
+.tox/
+nosetests.xml
+coverage/
+
+# Logs and databases
+*.log
+*.sqlite
+*.sqlite3
+*.db
+logs/
 
 # Docker
-Dockerfile
-docker-compose.yml
-.dockerignore
+.docker/
+docker-compose.override.yml
 
 # Project specific
-logs/
-*.log
+node_modules/
+.cache/
+*.local
+.supabase/
+
+# Data
 data/
+postgres_data/
+redis_data/
