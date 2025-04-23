@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: discord-mods-inc
+    env_file: .env
+    volumes:
+      - .:/app
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - supabase
+
+  redis:
+    image: redis:alpine
+    container_name: discord-mods-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  supabase:
+    image: supabase/postgres
+    container_name: discord-mods-supabase
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD:-your-password}
+      POSTGRES_DB: discord_mods
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
