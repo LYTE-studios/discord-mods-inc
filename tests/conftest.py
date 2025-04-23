@@ -74,7 +74,6 @@ def mock_env_vars(monkeypatch):
         'SUPABASE_KEY': 'test_key',
         'OPENAI_API_KEY': 'test_openai_key',
         'GITHUB_TOKEN': 'test_github_token',
-        'JWT_SECRET_KEY': 'test_jwt_secret',
         'ENCRYPTION_KEY': test_key.decode(),  # Use the generated Fernet key
         'LOG_LEVEL': 'DEBUG'
     }
@@ -118,15 +117,7 @@ def mock_psutil():
     )
     return psutil
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create event loop for async tests"""
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+# Event loop is provided by pytest-asyncio
 
 @pytest.fixture
 async def mock_discord_message():

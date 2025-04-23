@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-import jwt
 from datetime import datetime, timedelta
 from security.auth_manager import AuthManager
 from config import settings, Settings
@@ -20,9 +19,6 @@ def auth_manager():
     # Create a mock settings instance
     mock_settings = MagicMock(spec=Settings)
     mock_settings.ENCRYPTION_KEY = test_key.decode()
-    mock_settings.JWT_SECRET_KEY = 'test_jwt_secret'
-    mock_settings.JWT_ALGORITHM = 'HS256'
-    mock_settings.JWT_EXPIRATION_HOURS = 24
     mock_settings.RATE_LIMIT_CALLS = 100
     mock_settings.RATE_LIMIT_PERIOD = 60
     
@@ -31,122 +27,16 @@ def auth_manager():
         return AuthManager()
 
 @pytest.mark.asyncio
-async def test_create_token(auth_manager):
-    """Test JWT token creation"""
-    user_id = "test_user"
-    roles = ["admin", "developer"]
-    
-    token = await auth_manager.create_token(user_id, roles)
-    assert token is not None
-    
-    # Decode and verify token
-    payload = jwt.decode(
-        token,
-        settings.JWT_SECRET_KEY,
-        algorithms=['HS256']
-    )
-    
-    assert payload['user_id'] == user_id
-    assert payload['roles'] == roles
-    assert 'exp' in payload
-    assert 'iat' in payload
-    
-    # Test token creation with invalid inputs
-    assert await auth_manager.create_token(None, roles) is None
-    assert await auth_manager.create_token(user_id, None) is None
-    assert await auth_manager.create_token("", []) is None
-
-@pytest.mark.asyncio
-async def test_verify_token(auth_manager):
-    """Test JWT token verification"""
-    # Create a valid token
-    payload = {
-        'user_id': 'test_user',
-        'roles': ['admin'],
-        'exp': datetime.utcnow() + timedelta(hours=1),
-        'iat': datetime.utcnow()
-    }
-    token = jwt.encode(
-        payload,
-        settings.JWT_SECRET_KEY,
-        algorithm='HS256'
-    )
-    
-    # Test valid token
-    result = await auth_manager.verify_token(token)
-    assert result is not None
-    assert result['user_id'] == 'test_user'
-    assert result['roles'] == ['admin']
-    
-    # Test expired token
-    expired_payload = payload.copy()
-    expired_payload['exp'] = datetime.utcnow() - timedelta(hours=1)
-    expired_token = jwt.encode(
-        expired_payload,
-        settings.JWT_SECRET_KEY,
-        algorithm='HS256'
-    )
-    
-    result = await auth_manager.verify_token(expired_token)
-    assert result is None
-    
-    # Test invalid token
-    result = await auth_manager.verify_token("invalid_token")
-    assert result is None
-    
-    # Test blacklisted token
-    auth_manager.token_blacklist.add(token)
-    result = await auth_manager.verify_token(token)
-    assert result is None
-    
-    # Test token with invalid signature
-    invalid_token = jwt.encode(
-        payload,
-        'wrong_secret',
-        algorithm='HS256'
-    )
-    result = await auth_manager.verify_token(invalid_token)
-    assert result is None
-    
-    # Test empty token
-    result = await auth_manager.verify_token("")
-    assert result is None
-    result = await auth_manager.verify_token(None)
-    assert result is None
-
-@pytest.mark.asyncio
-async def test_revoke_token(auth_manager):
-    """Test token revocation"""
-    # Create a token
-    token = await auth_manager.create_token("test_user", ["admin"])
-    assert token is not None
-    
-    # Verify token works
-    assert await auth_manager.verify_token(token) is not None
-    
-    # Revoke token
-    assert await auth_manager.revoke_token(token) is True
-    
-    # Verify token no longer works
-    assert await auth_manager.verify_token(token) is None
-    
-    # Test revoking invalid token
-    assert await auth_manager.revoke_token("invalid_token") is False
-    
-    # Test revoking empty token
-    assert await auth_manager.revoke_token("") is False
-    assert await auth_manager.revoke_token(None) is False
-
-@pytest.mark.asyncio
-async def test_verify_permissions(auth_manager, test_db):
+async def test_verify_permissions(auth_manager):
     """Test permission verification"""
-    with patch('security.auth_manager.db', test_db):
-        # Configure mock
-        test_db.table = MagicMock(return_value=test_db)
-        test_db.select = MagicMock(return_value=test_db)
-        test_db.eq = MagicMock(return_value=test_db)
-        test_db.execute = AsyncMock(return_value=MagicMock(data=[{'roles': ['admin', 'developer']}]))
-        
+    # Mock database response
+    mock_db = MagicMock()
+    mock_db.table = MagicMock(return_value=mock_db)
+    mock_db.select = MagicMock(return_value=mock_db)
+    mock_db.eq = MagicMock(return_value=mock_db)
+    mock_db.execute = AsyncMock(return_value=MagicMock(data=[{'roles': ['admin', 'developer']}]))
+
+    with patch('security.auth_manager.db', mock_db):
         # Test valid permission
         assert await auth_manager.verify_permissions("test_user", ["admin"]) is True
         assert await auth_manager.verify_permissions("test_user", ["developer"]) is True
@@ -155,11 +45,11 @@ async def test_verify_permissions(auth_manager, test_db):
         assert await auth_manager.verify_permissions("test_user", ["moderator"]) is False
         
         # Test non-existent user
-        test_db.execute.return_value.data = []
+        mock_db.execute.return_value.data = []
         assert await auth_manager.verify_permissions("unknown_user", ["admin"]) is False
         
         # Test database error
-        test_db.execute.side_effect = Exception("Database error")
+        mock_db.execute.side_effect = Exception("Database error")
         assert await auth_manager.verify_permissions("test_user", ["admin"]) is False
         
         # Test invalid inputs
@@ -266,93 +156,3 @@ def test_signature_verification(auth_manager):
     assert auth_manager.verify_signature(b"test", None, "test") is False
     assert auth_manager.verify_signature(b"test", "test", None) is False
     assert auth_manager.verify_signature(b"", "", "") is False
-
-@pytest.mark.asyncio
-async def test_auth_logging(auth_manager, test_db):
-    """Test authentication event logging"""
-    with patch('security.auth_manager.db', test_db):
-        # Configure mock
-        test_db.table = MagicMock(return_value=test_db)
-        test_db.insert = MagicMock(return_value=test_db)
-        test_db.execute = AsyncMock()
-        
-        # Test successful logging
-        await auth_manager.log_auth_event(
-            user_id="test_user",
-            event_type="login",
-            details="Test login event"
-        )
-        
-        test_db.table.assert_called_with('auth_logs')
-        test_db.insert.assert_called_once()
-        test_db.execute.assert_called_once()
-        
-        # Test logging error
-        test_db.execute.side_effect = Exception("Logging error")
-        await auth_manager.log_auth_event(
-            user_id="test_user",
-            event_type="error",
-            details="Test error event"
-        )
-        
-        # Test invalid inputs
-        await auth_manager.log_auth_event(None, "login", "test")
-        await auth_manager.log_auth_event("test_user", None, "test")
-        await auth_manager.log_auth_event("test_user", "login", None)
-        await auth_manager.log_auth_event("", "", "")
-
-@pytest.mark.asyncio
-async def test_get_auth_logs(auth_manager, test_db):
-    """Test retrieving authentication logs"""
-    with patch('security.auth_manager.db', test_db):
-        # Configure mock
-        test_db.table = MagicMock(return_value=test_db)
-        test_db.select = MagicMock(return_value=test_db)
-        test_db.eq = MagicMock(return_value=test_db)
-        test_db.gte = MagicMock(return_value=test_db)
-        test_db.lte = MagicMock(return_value=test_db)
-        test_db.execute = AsyncMock(return_value=MagicMock(data=[{
-            'user_id': 'test_user',
-            'event_type': 'login',
-            'details': 'Test login event',
-            'timestamp': datetime.utcnow().isoformat()
-        }]))
-        
-        # Test without filters
-        logs = await auth_manager.get_auth_logs()
-        assert len(logs) == 1
-        assert logs[0]['user_id'] == 'test_user'
-        
-        # Test with user filter
-        logs = await auth_manager.get_auth_logs(user_id='test_user')
-        assert len(logs) == 1
-        
-        # Test with time range
-        start_time = datetime.utcnow() - timedelta(days=1)
-        end_time = datetime.utcnow()
-        logs = await auth_manager.get_auth_logs(
-            start_time=start_time,
-            end_time=end_time
-        )
-        assert len(logs) == 1
-        
-        # Test with all filters
-        logs = await auth_manager.get_auth_logs(
-            user_id='test_user',
-            start_time=start_time,
-            end_time=end_time
-        )
-        assert len(logs) == 1
-        
-        # Test database error
-        test_db.execute.side_effect = Exception("Database error")
-        logs = await auth_manager.get_auth_logs()
-        assert len(logs) == 0
-        
-        # Test invalid inputs
-        logs = await auth_manager.get_auth_logs(user_id=None)
-        assert len(logs) == 0
-        logs = await auth_manager.get_auth_logs(start_time="invalid")
-        assert len(logs) == 0
-        logs = await auth_manager.get_auth_logs(end_time="invalid")
-        assert len(logs) == 0

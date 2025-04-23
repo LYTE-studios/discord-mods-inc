@@ -1,0 +1,20 @@
+[run]
+source = .
+omit =
+    main.py
+    tests/*
+    */site-packages/*
+    deploy/*
+    htmlcov/*
+    logs/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    pass
+    raise ImportError
+    except ImportError:
+    if TYPE_CHECKING:

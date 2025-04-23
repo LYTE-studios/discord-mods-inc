@@ -31,9 +31,6 @@ class Settings(BaseSettings):
     WEBHOOK_PORT: int = int(os.getenv("WEBHOOK_PORT", "5000"))
     
     # Security Configuration
-    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
-    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
-    JWT_EXPIRATION_HOURS: int = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
     ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
     RATE_LIMIT_CALLS: int = int(os.getenv("RATE_LIMIT_CALLS", "100"))
     RATE_LIMIT_PERIOD: int = int(os.getenv("RATE_LIMIT_PERIOD", "60"))
@@ -77,9 +74,10 @@ class Settings(BaseSettings):
         "logs"
     ]
 
-    class Config:
-        case_sensitive = True
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = {
+        "case_sensitive": True,
+        "env_file": ".env",
+        "env_file_encoding": "utf-8"
+    }
 
 settings = Settings()
