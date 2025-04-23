@@ -75,21 +75,23 @@ fi
 if is_ubuntu_debian; then
     echo -e "${YELLOW}Installing Python dependencies...${NC}"
     sudo apt-get update
-    sudo apt-get install -y python3 python3-pip python3-venv
+    sudo apt-get install -y python3 python3-pip python3-full pipenv
 elif is_rhel_based; then
     echo -e "${YELLOW}Installing Python dependencies...${NC}"
-    sudo dnf install -y python3 python3-pip python3-virtualenv
+    sudo dnf install -y python3 python3-pip pipenv
 fi
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
-    echo -e "${YELLOW}Creating Python virtual environment...${NC}"
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install --upgrade pip
-    pip install -r requirements.txt
-    pip install -r requirements-dev.txt
+# Setup Python environment with pipenv
+echo -e "${YELLOW}Setting up Python environment with pipenv...${NC}"
+if ! command -v pipenv &> /dev/null; then
+    sudo pip3 install pipenv
 fi
+
+# Initialize pipenv and install dependencies
+export PIPENV_VENV_IN_PROJECT=1  # Keep virtualenv in project directory
+pipenv --python 3
+pipenv install
+pipenv install --dev
 
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
@@ -109,17 +111,18 @@ chmod 600 .env
 
 # Build and start containers
 echo -e "${YELLOW}Building and starting Docker containers...${NC}"
-docker-compose build
-docker-compose up -d
+sudo docker-compose build
+sudo docker-compose up -d
 
 # Check if containers are running
 if [ $? -eq 0 ]; then
     echo -e "\n${GREEN}Setup completed successfully!${NC}"
     echo -e "\nNext steps:"
     echo -e "1. Edit the ${YELLOW}.env${NC} file with your configuration"
-    echo -e "2. Run ${YELLOW}docker-compose logs -f${NC} to view the logs"
+    echo -e "2. Run ${YELLOW}sudo docker-compose logs -f${NC} to view the logs"
     echo -e "3. Visit ${YELLOW}http://localhost:5000${NC} to check the application"
-    echo -e "\nTo stop the application, run: ${YELLOW}docker-compose down${NC}"
+    echo -e "\nTo stop the application, run: ${YELLOW}sudo docker-compose down${NC}"
+    echo -e "\nTo activate the Python environment, run: ${YELLOW}pipenv shell${NC}"
     
     # Notify about Docker group
     if [ -n "$(groups | grep docker)" ]; then
