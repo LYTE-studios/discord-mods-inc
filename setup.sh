@@ -22,17 +22,11 @@ print_error() {
     echo -e "${RED}[-] $1${NC}"
 }
 
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then
-    print_error "Please run as root"
-    exit 1
-fi
-
 # Function to install package if not present
 install_if_missing() {
     if ! command -v $1 &> /dev/null; then
         print_status "Installing $1..."
-        apt-get install -y $2 || {
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $2 || {
             print_error "Failed to install $1"
             exit 1
         }
@@ -43,7 +37,11 @@ install_if_missing() {
 
 # Update package list
 print_status "Updating package list..."
-apt-get update
+sudo rm -f /var/lib/apt/lists/lock
+sudo rm -f /var/cache/apt/archives/lock
+sudo rm -f /var/lib/dpkg/lock*
+sudo dpkg --configure -a
+sudo DEBIAN_FRONTEND=noninteractive apt-get update
 
 # Install Python3 if not present
 install_if_missing python3 "python3"
@@ -52,7 +50,7 @@ install_if_missing python3-venv "python3-venv"
 
 # Install required system packages
 print_status "Installing required packages..."
-apt-get install -y \
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -73,10 +71,10 @@ apt-get install -y \
 if ! command -v docker &> /dev/null; then
     print_status "Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
-    usermod -aG docker $SUDO_USER
-    systemctl enable docker
-    systemctl start docker
+    sudo sh get-docker.sh
+    sudo usermod -aG docker $USER
+    sudo systemctl enable docker
+    sudo systemctl start docker
 else
     print_status "Docker is already installed"
 fi
@@ -84,26 +82,26 @@ fi
 # Install Docker Compose if not present
 if ! command -v docker-compose &> /dev/null; then
     print_status "Installing Docker Compose..."
-    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
+    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
 else
     print_status "Docker Compose is already installed"
 fi
 
 # Create necessary directories
 print_status "Creating project directories..."
-mkdir -p /var/www/$DOMAIN/{static,media,logs,ssl,nginx/conf.d}
+sudo mkdir -p /var/www/$DOMAIN/{static,media,logs,ssl,nginx/conf.d}
 
 # Set proper permissions
 print_status "Setting permissions..."
-chown -R $SUDO_USER:$SUDO_USER /var/www/$DOMAIN
-chmod -R 755 /var/www/$DOMAIN
+sudo chown -R $USER:$USER /var/www/$DOMAIN
+sudo chmod -R 755 /var/www/$DOMAIN
 
 # Configure firewall
 print_status "Configuring firewall..."
-ufw allow 'Nginx Full'
-ufw allow OpenSSH
-ufw --force enable
+sudo ufw allow 'Nginx Full'
+sudo ufw allow OpenSSH
+sudo ufw --force enable
 
 # Generate environment file if not exists
 if [ ! -f .env ]; then
@@ -138,7 +136,7 @@ fi
 
 # Configure Nginx
 print_status "Configuring Nginx..."
-cat > /etc/nginx/conf.d/$DOMAIN.conf << EOL
+sudo bash -c "cat > /etc/nginx/conf.d/$DOMAIN.conf" << EOL
 upstream django {
     server web:8000;
 }
@@ -228,24 +226,24 @@ EOL
 
 # Install Python dependencies
 print_status "Installing Python dependencies..."
-pip3 install -r requirements.txt
+sudo pip3 install -r requirements.txt
 
 # Obtain SSL certificate
 print_status "Obtaining SSL certificate..."
-certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email $(grep SSL_EMAIL .env | cut -d '=' -f2) --redirect
+sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email $(grep SSL_EMAIL .env | cut -d '=' -f2) --redirect
 
 # Setup auto-renewal for SSL
 print_status "Setting up SSL auto-renewal..."
-(crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet") | crontab -
+(sudo crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet") | sudo crontab -
 
 # Copy project files
 print_status "Copying project files..."
-cp -r web/* /var/www/$DOMAIN/
-cp .env /var/www/$DOMAIN/
+sudo cp -r web/* /var/www/$DOMAIN/
+sudo cp .env /var/www/$DOMAIN/
 
 # Build and start Docker containers
 print_status "Starting Docker containers..."
-docker-compose -f docker-compose.prod.yml up -d --build
+sudo docker-compose -f docker-compose.prod.yml up -d --build
 
 print_status "Setup completed successfully!"
 print_warning "Please ensure you have updated the .env file with your credentials"
