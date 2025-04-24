@@ -1,0 +1,181 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    volumes:
+      - static_volume:/var/www/${DOMAIN}/static
+      - media_volume:/var/www/${DOMAIN}/media
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_DEBUG=${DJANGO_DEBUG}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - SUPABASE_URL=http://kong:8000
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_DB_NAME=${SUPABASE_DB_NAME}
+      - SUPABASE_DB_USER=${SUPABASE_DB_USER}
+      - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    depends_on:
+      - redis
+      - supabase-db
+      - kong
+    networks:
+      - web_network
+      - internal_network
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    volumes:
+      - static_volume:/var/www/${DOMAIN}/static
+      - media_volume:/var/www/${DOMAIN}/media
+      - /etc/nginx/conf.d:/etc/nginx/conf.d
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/${DOMAIN}/logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - web
+    networks:
+      - web_network
+
+  redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal_network
+
+  # Supabase Stack
+  supabase-db:
+    image: supabase/postgres:14.1.0
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD}
+      POSTGRES_DB: ${SUPABASE_DB_NAME}
+    volumes:
+      - supabase_db_data:/var/lib/postgresql/data
+    networks:
+      - internal_network
+
+  supabase-studio:
+    image: supabase/studio:latest
+    restart: always
+    environment:
+      SUPABASE_URL: http://kong:8000
+      STUDIO_PG_META_URL: http://meta:8080
+      SUPABASE_SERVICE_KEY: ${SUPABASE_KEY}
+    depends_on:
+      - supabase-db
+      - kong
+    networks:
+      - internal_network
+
+  kong:
+    image: kong:2.8.1-alpine
+    restart: always
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl
+    volumes:
+      - ./kong.yml:/var/lib/kong/kong.yml:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      - supabase-db
+    networks:
+      - internal_network
+
+  meta:
+    image: supabase/postgres-meta:latest
+    restart: always
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: supabase-db
+      PG_META_DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
+    depends_on:
+      - supabase-db
+    networks:
+      - internal_network
+
+  certbot:
+    image: certbot/certbot
+    restart: unless-stopped
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/lib/letsencrypt:/var/lib/letsencrypt
+    depends_on:
+      - nginx
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+  # Queue worker for background tasks
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A config worker -l INFO
+    restart: always
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_DEBUG=${DJANGO_DEBUG}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - SUPABASE_URL=http://kong:8000
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    depends_on:
+      - redis
+      - supabase-db
+    networks:
+      - internal_network
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A config beat -l INFO
+    restart: always
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_DEBUG=${DJANGO_DEBUG}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - SUPABASE_URL=http://kong:8000
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+    depends_on:
+      - redis
+      - supabase-db
+    networks:
+      - internal_network
+
+volumes:
+  static_volume:
+  media_volume:
+  redis_data:
+  supabase_db_data:
+
+networks:
+  web_network:
+    driver: bridge
+  internal_network:
+    driver: bridge
+    internal: true

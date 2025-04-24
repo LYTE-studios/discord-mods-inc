@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="conversations-container">
+    <div class="conversations-header">
+        <h1>Your Conversations</h1>
+        <a href="{% url 'chat:chat_room' %}" class="btn-new">New Conversation</a>
+    </div>
+
+    <div class="conversations-list">
+        {% if conversations %}
+        {% for conversation in conversations %}
+        <div class="conversation-card">
+            <a href="{% url 'chat:chat_room' conversation.id %}" class="conversation-link">
+                <div class="conversation-title">{{ conversation.title }}</div>
+                <div class="conversation-meta">
+                    <span class="conversation-date">{{ conversation.updated_at|date:"M d, Y" }}</span>
+                    <span class="conversation-time">{{ conversation.updated_at|time:"H:i" }}</span>
+                </div>
+                {% with last_message=conversation.messages.last %}
+                {% if last_message %}
+                <div class="conversation-preview">
+                    <span class="preview-author">{{ last_message.get_role_display }}:</span>
+                    {{ last_message.content|truncatechars:100 }}
+                </div>
+                {% endif %}
+                {% endwith %}
+            </a>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="no-conversations">
+            <p>No conversations yet.</p>
+            <p>Start a new conversation to interact with the AI team!</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .conversations-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+
+    .conversations-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .btn-new {
+        padding: 0.75rem 1.5rem;
+        background-color: var(--primary-color);
+        color: white;
+        text-decoration: none;
+        border-radius: 0.5rem;
+        transition: background-color 0.2s;
+    }
+
+    .btn-new:hover {
+        background-color: var(--secondary-color);
+    }
+
+    .conversation-card {
+        background: white;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
+    }
+
+    .conversation-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .conversation-link {
+        display: block;
+        padding: 1rem;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .conversation-title {
+        font-weight: bold;
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .conversation-meta {
+        font-size: 0.875rem;
+        color: #64748b;
+        margin-bottom: 0.5rem;
+    }
+
+    .conversation-preview {
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+
+    .preview-author {
+        font-weight: 500;
+        color: var(--primary-color);
+    }
+
+    .no-conversations {
+        text-align: center;
+        padding: 3rem;
+        background: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .no-conversations p:first-child {
+        font-size: 1.25rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+
+    .no-conversations p:last-child {
+        color: #64748b;
+    }
+</style>
+{% endblock %}

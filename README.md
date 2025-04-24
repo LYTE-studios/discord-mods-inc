@@ -1,20 +1,21 @@
-# Discord Mods Inc - AI Development Team
+# AI Development Team Platform
 
-A revolutionary platform that creates AI-powered development teams through Discord bots. Each team member (CTO, UX Designer, UI Designer, Developers, and Testers) is an AI bot that collaborates to develop software based on user requests.
+A revolutionary platform that creates AI-powered development teams through a web interface. Each team member (CTO, UX Designer, UI Designer, Developers, and Testers) is an AI agent that collaborates to develop software based on user requests.
 
 ## 🌟 Features
 
-- **AI Team Members**: Each bot has a specialized role and personality
+- **AI Team Members**: Each agent has a specialized role and personality
 - **GitHub Integration**: Automatic repository management and code handling
 - **Ticket System**: Organized task management and tracking
-- **Real-time Collaboration**: Bots communicate and work together
+- **Real-time Collaboration**: AI agents communicate and work together
 - **Monitoring System**: Track system health and performance
 - **Security**: JWT-based authentication and role-based access control
+- **Web Interface**: Modern Django-based interface for interacting with AI team
 
 ## 🛠 Technology Stack
 
-- **Language**: Python 3.11+
-- **Framework**: Discord.py for bot interactions
+- **Backend**: Python 3.11+
+- **Web Framework**: Django 4.2+
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: JWT + Supabase Auth
 - **Monitoring**: Custom monitoring system with metrics collection
@@ -25,7 +26,6 @@ A revolutionary platform that creates AI-powered development teams through Disco
 ## 📋 Prerequisites
 
 - Docker and Docker Compose
-- Discord Bot Token
 - Supabase Account and Credentials
 - GitHub Token (for repository management)
 - OpenAI API Key
@@ -40,8 +40,9 @@ cd discord-mods-inc
 
 2. Create a `.env` file:
 ```env
-DISCORD_TOKEN=your_discord_token
-DISCORD_GUILD_ID=your_guild_id
+DJANGO_SECRET_KEY=your_django_secret_key
+DJANGO_DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_key
 OPENAI_API_KEY=your_openai_key
@@ -56,18 +57,20 @@ LOG_LEVEL=INFO
 docker-compose up -d
 ```
 
+4. Access the web interface at http://localhost:8000
+
 ## 🐳 Docker Setup
 
 The application is containerized using Docker for easy deployment and scaling. The setup includes:
 
-- Application container
+- Django application container
 - Supabase container (for local development)
 - Redis container (for caching and rate limiting)
 
 ### Building the Image
 
 ```bash
-docker build -t discord-mods-inc .
+docker build -t ai-team-platform .
 ```
 
 ### Running with Docker Compose
@@ -99,7 +102,13 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
-4. Run tests:
+4. Run Django development server:
+```bash
+python manage.py migrate
+python manage.py runserver
+```
+
+5. Run tests:
 ```bash
 pytest -v
 ```
@@ -107,9 +116,12 @@ pytest -v
 ## 📚 Project Structure
 
 ```
-discord-mods-inc/
+ai-team-platform/
 ├── ai/                     # AI team member implementations
-├── cogs/                   # Discord bot command modules
+├── web/                    # Django web application
+│   ├── templates/         # HTML templates
+│   ├── static/           # Static files (CSS, JS)
+│   └── views/            # View controllers
 ├── database/              # Database client and models
 ├── github/                # GitHub integration
 ├── monitoring/            # System monitoring
@@ -146,7 +158,7 @@ The system uses a ticket-based workflow:
 The system includes comprehensive monitoring:
 
 - System metrics (CPU, memory, disk usage)
-- API and command latency tracking
+- API and request latency tracking
 - Error rate monitoring
 - Alert system for issues
 - Performance tracking
@@ -188,4 +200,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🤝 Support
 
-For support, join our [Discord server](https://discord.gg/your-invite-link) or open an issue.
+For support, please open an issue in the GitHub repository.

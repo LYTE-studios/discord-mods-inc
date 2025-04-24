@@ -1,135 +1,235 @@
 #!/bin/bash
 
 # Colors for output
+RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}Setting up Discord Mods Inc...${NC}\n"
+# Domain name
+DOMAIN="gideon.lytestudios.be"
 
-# Function to check if we're running on Ubuntu/Debian
-is_ubuntu_debian() {
-    [ -f "/etc/debian_version" ]
+# Function to print status messages
+print_status() {
+    echo -e "${GREEN}[+] $1${NC}"
 }
 
-# Function to check if we're running on RHEL/CentOS/Fedora
-is_rhel_based() {
-    [ -f "/etc/redhat-release" ]
+print_warning() {
+    echo -e "${YELLOW}[!] $1${NC}"
 }
 
-# Function to install Docker on Ubuntu/Debian
-install_docker_ubuntu() {
-    echo -e "${YELLOW}Installing Docker...${NC}"
-    sudo apt-get update
-    sudo apt-get install -y ca-certificates curl gnupg
-    sudo install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    sudo chmod a+r /etc/apt/keyrings/docker.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-    sudo usermod -aG docker $USER
-    echo -e "${GREEN}Docker installed successfully!${NC}"
+print_error() {
+    echo -e "${RED}[-] $1${NC}"
 }
 
-# Function to install Docker on RHEL/CentOS/Fedora
-install_docker_rhel() {
-    echo -e "${YELLOW}Installing Docker...${NC}"
-    sudo dnf -y install dnf-plugins-core
-    sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-    sudo dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-    sudo systemctl start docker
-    sudo systemctl enable docker
-    sudo usermod -aG docker $USER
-    echo -e "${GREEN}Docker installed successfully!${NC}"
-}
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    print_error "Please run as root"
+    exit 1
+fi
 
-# Function to install Docker Compose
-install_docker_compose() {
-    echo -e "${YELLOW}Installing Docker Compose...${NC}"
-    COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d'"' -f4)
-    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
-    echo -e "${GREEN}Docker Compose installed successfully!${NC}"
-}
+# Check system requirements
+print_status "Checking system requirements..."
+if ! command -v python3 &> /dev/null; then
+    print_error "Python3 is required but not installed."
+    exit 1
+fi
 
-# Check and install Docker if needed
+# Update system packages
+print_status "Updating system packages..."
+apt-get update
+apt-get upgrade -y
+
+# Install required packages
+print_status "Installing required packages..."
+apt-get install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    software-properties-common \
+    python3-pip \
+    python3-venv \
+    nginx \
+    certbot \
+    python3-certbot-nginx \
+    ufw
+
+# Install Docker if not present
 if ! command -v docker &> /dev/null; then
-    if is_ubuntu_debian; then
-        install_docker_ubuntu
-    elif is_rhel_based; then
-        install_docker_rhel
-    else
-        echo -e "${RED}Unsupported operating system. Please install Docker manually.${NC}"
-        exit 1
-    fi
+    print_status "Installing Docker..."
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh
+    usermod -aG docker $SUDO_USER
+    systemctl enable docker
+    systemctl start docker
 fi
 
-# Check and install Docker Compose if needed
+# Install Docker Compose if not present
 if ! command -v docker-compose &> /dev/null; then
-    install_docker_compose
-fi
-
-# Install Python dependencies if needed
-if is_ubuntu_debian; then
-    echo -e "${YELLOW}Installing Python dependencies...${NC}"
-    sudo apt-get update
-    sudo apt-get install -y python3 python3-pip python3-full pipenv
-elif is_rhel_based; then
-    echo -e "${YELLOW}Installing Python dependencies...${NC}"
-    sudo dnf install -y python3 python3-pip pipenv
-fi
-
-# Setup Python environment with pipenv
-echo -e "${YELLOW}Setting up Python environment with pipenv...${NC}"
-if ! command -v pipenv &> /dev/null; then
-    sudo pip3 install pipenv
-fi
-
-# Initialize pipenv and install dependencies
-export PIPENV_VENV_IN_PROJECT=1  # Keep virtualenv in project directory
-pipenv --python 3
-pipenv lock  # Generate new Pipfile.lock
-pipenv install --deploy  # Install from Pipfile.lock
-pipenv install --dev --deploy  # Install dev dependencies from Pipfile.lock
-
-# Create .env file if it doesn't exist
-if [ ! -f .env ]; then
-    echo -e "${YELLOW}Creating .env file from template...${NC}"
-    cp .env.example .env
-    echo -e "${GREEN}Created .env file. Please edit it with your configuration.${NC}"
+    print_status "Installing Docker Compose..."
+    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
 fi
 
 # Create necessary directories
-echo -e "${YELLOW}Creating necessary directories...${NC}"
-mkdir -p logs data
+print_status "Creating project directories..."
+mkdir -p /var/www/$DOMAIN
+mkdir -p /var/www/$DOMAIN/static
+mkdir -p /var/www/$DOMAIN/media
+mkdir -p /var/www/$DOMAIN/logs
+mkdir -p /var/www/$DOMAIN/ssl
+mkdir -p /var/www/$DOMAIN/nginx/conf.d
 
-# Set correct permissions
-echo -e "${YELLOW}Setting correct permissions...${NC}"
-chmod +x setup.sh
-chmod 600 .env
+# Set proper permissions
+print_status "Setting permissions..."
+chown -R $SUDO_USER:$SUDO_USER /var/www/$DOMAIN
+chmod -R 755 /var/www/$DOMAIN
 
-# Build and start containers
-echo -e "${YELLOW}Building and starting Docker containers...${NC}"
-sudo docker-compose build
-sudo docker-compose up -d
+# Configure firewall
+print_status "Configuring firewall..."
+ufw allow 'Nginx Full'
+ufw allow OpenSSH
+ufw --force enable
 
-# Check if containers are running
-if [ $? -eq 0 ]; then
-    echo -e "\n${GREEN}Setup completed successfully!${NC}"
-    echo -e "\nNext steps:"
-    echo -e "1. Edit the ${YELLOW}.env${NC} file with your configuration"
-    echo -e "2. Run ${YELLOW}sudo docker-compose logs -f${NC} to view the logs"
-    echo -e "3. Visit ${YELLOW}http://localhost:5000${NC} to check the application"
-    echo -e "\nTo stop the application, run: ${YELLOW}sudo docker-compose down${NC}"
-    echo -e "\nTo activate the Python environment, run: ${YELLOW}pipenv shell${NC}"
-    
-    # Notify about Docker group
-    if [ -n "$(groups | grep docker)" ]; then
-        echo -e "\n${YELLOW}Note: You've been added to the docker group. Please log out and back in for this to take effect.${NC}"
-    fi
-else
-    echo -e "\n${RED}Setup failed. Please check the error messages above.${NC}"
-    exit 1
+# Generate environment file if not exists
+if [ ! -f .env ]; then
+    print_status "Generating environment file..."
+    cat > .env << EOL
+DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
+DJANGO_DEBUG=False
+ALLOWED_HOSTS=$DOMAIN
+DOMAIN=$DOMAIN
+
+# Database settings
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
+SUPABASE_DB_NAME=postgres
+SUPABASE_DB_USER=postgres
+SUPABASE_DB_PASSWORD=your_db_password
+
+# Redis settings
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# SSL settings
+SSL_EMAIL=your_email@example.com
+
+# Other settings
+OPENAI_API_KEY=your_openai_key
+GITHUB_TOKEN=your_github_token
+JWT_SECRET_KEY=your_jwt_secret
+ENCRYPTION_KEY=your_encryption_key
+EOL
+    print_warning "Please edit .env file with your actual credentials"
 fi
+
+# Configure Nginx
+print_status "Configuring Nginx..."
+cat > /etc/nginx/conf.d/$DOMAIN.conf << EOL
+upstream django {
+    server web:8000;
+}
+
+map \$http_upgrade \$connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
+server {
+    listen 80;
+    server_name $DOMAIN;
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN;
+
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_tickets off;
+
+    # Modern configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    # HSTS (uncomment if you're sure)
+    # add_header Strict-Transport-Security "max-age=63072000" always;
+
+    # OCSP Stapling
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 8.8.8.8 8.8.4.4 valid=300s;
+    resolver_timeout 5s;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+
+    # Logs
+    access_log /var/www/$DOMAIN/logs/nginx-access.log;
+    error_log /var/www/$DOMAIN/logs/nginx-error.log;
+
+    # Proxy settings
+    location / {
+        proxy_pass http://django;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_read_timeout 86400;
+    }
+
+    # Static files
+    location /static/ {
+        alias /var/www/$DOMAIN/static/;
+        expires 1y;
+        access_log off;
+        add_header Cache-Control "public";
+    }
+
+    # Media files
+    location /media/ {
+        alias /var/www/$DOMAIN/media/;
+        expires 1y;
+        access_log off;
+        add_header Cache-Control "public";
+    }
+
+    # Rate limiting
+    limit_req_zone \$binary_remote_addr zone=one:10m rate=1r/s;
+    limit_req zone=one burst=10 nodelay;
+}
+EOL
+
+# Obtain SSL certificate
+print_status "Obtaining SSL certificate..."
+certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email $(grep SSL_EMAIL .env | cut -d '=' -f2) --redirect
+
+# Setup auto-renewal for SSL
+print_status "Setting up SSL auto-renewal..."
+(crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet") | crontab -
+
+# Copy project files
+print_status "Copying project files..."
+cp -r web/* /var/www/$DOMAIN/
+cp .env /var/www/$DOMAIN/
+
+# Build and start Docker containers
+print_status "Starting Docker containers..."
+docker-compose -f docker-compose.prod.yml up -d --build
+
+print_status "Setup completed successfully!"
+print_warning "Please ensure you have updated the .env file with your credentials"
+print_warning "Your site should be available at https://$DOMAIN"

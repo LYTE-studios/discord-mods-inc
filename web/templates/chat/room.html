@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="chat-container">
+    <!-- AI Team Status Sidebar -->
+    <aside class="team-status">
+        <h2>AI Team Members</h2>
+        <div class="team-members">
+            <div class="team-member" data-role="cto">
+                <span class="status-dot"></span>
+                <span class="member-name">CTO</span>
+            </div>
+            <div class="team-member" data-role="ux">
+                <span class="status-dot"></span>
+                <span class="member-name">UX Designer</span>
+            </div>
+            <div class="team-member" data-role="ui">
+                <span class="status-dot"></span>
+                <span class="member-name">UI Designer</span>
+            </div>
+            <div class="team-member" data-role="dev">
+                <span class="status-dot"></span>
+                <span class="member-name">Developer</span>
+            </div>
+            <div class="team-member" data-role="tester">
+                <span class="status-dot"></span>
+                <span class="member-name">Tester</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <div class="chat-main">
+        <!-- Message History -->
+        <div class="message-history" id="messageHistory">
+            {% for message in messages %}
+            <div class="message {% if message.role == 'user' %}message-user{% else %}message-ai{% endif %}"
+                data-role="{{ message.role }}">
+                <div class="message-header">
+                    <span class="message-author">{{ message.get_role_display }}</span>
+                    <span class="message-time">{{ message.created_at|date:"H:i" }}</span>
+                </div>
+                <div class="message-content">
+                    {{ message.content }}
+                </div>
+                {% if message.ticket_id %}
+                <div class="message-ticket">
+                    Ticket: #{{ message.ticket_id }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Message Input -->
+        <div class="message-input">
+            <form id="messageForm" class="input-form">
+                {% csrf_token %}
+                <textarea id="messageText" name="message" placeholder="Type your message here..." rows="3"></textarea>
+                <button type="submit" class="btn-send">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Current Ticket Sidebar -->
+    <aside class="ticket-status">
+        <h2>Current Ticket</h2>
+        <div id="currentTicket" class="ticket-details">
+            {% if current_ticket %}
+            <div class="ticket-header">
+                <span class="ticket-id">#{{ current_ticket.id }}</span>
+                <span class="ticket-status">{{ current_ticket.status }}</span>
+            </div>
+            <div class="ticket-title">{{ current_ticket.title }}</div>
+            <div class="ticket-description">{{ current_ticket.description }}</div>
+            <div class="ticket-assignee">
+                Assigned to: {{ current_ticket.assignee }}
+            </div>
+            {% else %}
+            <p>No active ticket</p>
+            {% endif %}
+        </div>
+    </aside>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const WEBSOCKET_URL = '{{ websocket_url }}';
+</script>
+<script src="/static/js/chat.js"></script>
+{% endblock %}
