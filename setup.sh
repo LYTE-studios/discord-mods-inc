@@ -28,31 +28,46 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Check system requirements
-print_status "Checking system requirements..."
-if ! command -v python3 &> /dev/null; then
-    print_error "Python3 is required but not installed."
-    exit 1
-fi
+# Function to install package if not present
+install_if_missing() {
+    if ! command -v $1 &> /dev/null; then
+        print_status "Installing $1..."
+        apt-get install -y $2 || {
+            print_error "Failed to install $1"
+            exit 1
+        }
+    else
+        print_status "$1 is already installed"
+    fi
+}
 
-# Update system packages
-print_status "Updating system packages..."
+# Update package list
+print_status "Updating package list..."
 apt-get update
-apt-get upgrade -y
 
-# Install required packages
+# Install Python3 if not present
+install_if_missing python3 "python3"
+install_if_missing pip3 "python3-pip"
+install_if_missing python3-venv "python3-venv"
+
+# Install required system packages
 print_status "Installing required packages..."
 apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
     software-properties-common \
-    python3-pip \
-    python3-venv \
     nginx \
     certbot \
     python3-certbot-nginx \
-    ufw
+    ufw \
+    git \
+    build-essential \
+    libpq-dev \
+    || {
+        print_error "Failed to install required packages"
+        exit 1
+    }
 
 # Install Docker if not present
 if ! command -v docker &> /dev/null; then
@@ -62,6 +77,8 @@ if ! command -v docker &> /dev/null; then
     usermod -aG docker $SUDO_USER
     systemctl enable docker
     systemctl start docker
+else
+    print_status "Docker is already installed"
 fi
 
 # Install Docker Compose if not present
@@ -69,16 +86,13 @@ if ! command -v docker-compose &> /dev/null; then
     print_status "Installing Docker Compose..."
     curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
+else
+    print_status "Docker Compose is already installed"
 fi
 
 # Create necessary directories
 print_status "Creating project directories..."
-mkdir -p /var/www/$DOMAIN
-mkdir -p /var/www/$DOMAIN/static
-mkdir -p /var/www/$DOMAIN/media
-mkdir -p /var/www/$DOMAIN/logs
-mkdir -p /var/www/$DOMAIN/ssl
-mkdir -p /var/www/$DOMAIN/nginx/conf.d
+mkdir -p /var/www/$DOMAIN/{static,media,logs,ssl,nginx/conf.d}
 
 # Set proper permissions
 print_status "Setting permissions..."
@@ -101,24 +115,23 @@ ALLOWED_HOSTS=$DOMAIN
 DOMAIN=$DOMAIN
 
 # Database settings
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
 SUPABASE_DB_NAME=postgres
 SUPABASE_DB_USER=postgres
-SUPABASE_DB_PASSWORD=your_db_password
+SUPABASE_DB_PASSWORD=super_secret_db_password_123
+SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNTE2MjM5MDIyfQ.vZ7BeGD5k7RAVbXkGh-SuH9tGjhLrCuKn1W3e_Zf8tc
 
 # Redis settings
 REDIS_HOST=redis
 REDIS_PORT=6379
 
 # SSL settings
-SSL_EMAIL=your_email@example.com
+SSL_EMAIL=admin@lytestudios.be
 
 # Other settings
-OPENAI_API_KEY=your_openai_key
-GITHUB_TOKEN=your_github_token
-JWT_SECRET_KEY=your_jwt_secret
-ENCRYPTION_KEY=your_encryption_key
+OPENAI_API_KEY=${OPENAI_API_KEY:-your_openai_key}
+GITHUB_TOKEN=${GITHUB_TOKEN:-your_github_token}
+JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
+ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key}
 EOL
     print_warning "Please edit .env file with your actual credentials"
 fi
@@ -212,6 +225,10 @@ server {
     limit_req zone=one burst=10 nodelay;
 }
 EOL
+
+# Install Python dependencies
+print_status "Installing Python dependencies..."
+pip3 install -r requirements.txt
 
 # Obtain SSL certificate
 print_status "Obtaining SSL certificate..."
