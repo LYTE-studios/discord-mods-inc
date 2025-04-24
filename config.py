@@ -44,17 +44,13 @@ class Settings(BaseSettings):
     MONITORING_INTERVAL: int = int(os.getenv("MONITORING_INTERVAL", "60"))
     MONITORING_NOTIFICATIONS_CHANNEL: str = os.getenv("MONITORING_NOTIFICATIONS_CHANNEL", "")
     METRICS_RETENTION_DAYS: int = int(os.getenv("METRICS_RETENTION_DAYS", "30"))
-
-    @property
-    def ALERT_THRESHOLDS(self) -> Dict[str, float]:
-        """Get alert thresholds with environment variable overrides"""
-        return {
-            'cpu_usage': float(os.getenv("ALERT_THRESHOLD_CPU", "80.0")),
-            'memory_usage': float(os.getenv("ALERT_THRESHOLD_MEMORY", "80.0")),
-            'api_latency': float(os.getenv("ALERT_THRESHOLD_API_LATENCY", "2000.0")),
-            'error_rate': float(os.getenv("ALERT_THRESHOLD_ERROR_RATE", "5.0")),
-            'disk_usage': float(os.getenv("ALERT_THRESHOLD_DISK", "90.0"))
-        }
+    
+    # Alert Thresholds
+    CPU_THRESHOLD: float = float(os.getenv("ALERT_THRESHOLD_CPU", "80.0"))
+    MEMORY_THRESHOLD: float = float(os.getenv("ALERT_THRESHOLD_MEMORY", "80.0"))
+    API_LATENCY_THRESHOLD: float = float(os.getenv("ALERT_THRESHOLD_API_LATENCY", "2000.0"))
+    ERROR_RATE_THRESHOLD: float = float(os.getenv("ALERT_THRESHOLD_ERROR_RATE", "5.0"))
+    DISK_THRESHOLD: float = float(os.getenv("ALERT_THRESHOLD_DISK", "90.0"))
     
     # Logging Configuration
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
