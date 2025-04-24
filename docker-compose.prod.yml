@@ -27,14 +27,14 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     depends_on:
       - redis
-      - supabase-db
+      - postgres
       - kong
     networks:
       - web_network
       - internal_network
 
   nginx:
-    image: nginx:alpine
+    image: nginx:1.23-alpine
     restart: always
     volumes:
       - static_volume:/var/www/${DOMAIN}/static
@@ -51,7 +51,7 @@ services:
       - web_network
 
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     restart: always
     volumes:
       - redis_data:/data
@@ -59,26 +59,28 @@ services:
       - internal_network
 
   # Supabase Stack
-  supabase-db:
-    image: supabase/postgres:14.1.0
+  postgres:
+    image: supabase/postgres:15.1.0.117
     restart: always
     environment:
       POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD}
       POSTGRES_DB: ${SUPABASE_DB_NAME}
     volumes:
-      - supabase_db_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
     networks:
       - internal_network
 
-  supabase-studio:
-    image: supabase/studio:latest
+  studio:
+    image: supabase/studio:20230320-4cccfe3
     restart: always
     environment:
-      SUPABASE_URL: http://kong:8000
       STUDIO_PG_META_URL: http://meta:8080
-      SUPABASE_SERVICE_KEY: ${SUPABASE_KEY}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_REST_URL: http://kong:8000/rest/v1/
+      SUPABASE_PUBLIC_URL: http://localhost:8000
+      SUPABASE_ANON_KEY: ${SUPABASE_KEY}
     depends_on:
-      - supabase-db
+      - postgres
       - kong
     networks:
       - internal_network
@@ -96,24 +98,24 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - supabase-db
+      - postgres
     networks:
       - internal_network
 
   meta:
-    image: supabase/postgres-meta:latest
+    image: supabase/postgres-meta:v0.68.0
     restart: always
     environment:
       PG_META_PORT: 8080
-      PG_META_DB_HOST: supabase-db
+      PG_META_DB_HOST: postgres
       PG_META_DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
     depends_on:
-      - supabase-db
+      - postgres
     networks:
       - internal_network
 
   certbot:
-    image: certbot/certbot
+    image: certbot/certbot:v2.5.0
     restart: unless-stopped
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt
@@ -142,7 +144,7 @@ services:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
     depends_on:
       - redis
-      - supabase-db
+      - postgres
     networks:
       - internal_network
 
@@ -163,7 +165,7 @@ services:
       - REDIS_PORT=${REDIS_PORT}
     depends_on:
       - redis
-      - supabase-db
+      - postgres
     networks:
       - internal_network
 
@@ -171,7 +173,7 @@ volumes:
   static_volume:
   media_volume:
   redis_data:
-  supabase_db_data:
+  db_data:
 
 networks:
   web_network:
