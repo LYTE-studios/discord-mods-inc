@@ -21,17 +21,21 @@ WORKDIR /app
 RUN addgroup --system web \
     && adduser --system --ingroup web web
 
+# Copy entrypoint script and set permissions
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install pytest pytest-django pytest-cov pytest-asyncio
 
-# Copy project files
-COPY . .
-
-# Create necessary directories and set permissions
+# Create necessary directories
 RUN mkdir -p /app/static /app/media \
     && chown -R web:web /app
+
+# Copy project files
+COPY --chown=web:web . .
 
 # Switch to non-root user
 USER web
@@ -40,8 +44,6 @@ USER web
 EXPOSE 8000
 
 # Set the entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 ENTRYPOINT ["docker-entrypoint.sh"]
 
 # Default command

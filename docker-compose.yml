@@ -1,50 +1,94 @@
 services:
-  app:
-    build: .
-    container_name: discord-mods-inc
-    env_file: .env
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
     volumes:
-      - .:/app
-    restart: unless-stopped
+      - static_volume:/app/static
+      - media_volume:/app/media
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_DEBUG=${DJANGO_DEBUG}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
+      - redis
+    networks:
+      - web_network
+      - internal_network
+
+  nginx:
+    image: nginx:1.23-alpine
+    volumes:
+      - static_volume:/app/static
+      - media_volume:/app/media
+      - ./nginx:/etc/nginx/conf.d
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - web
+    networks:
+      - web_network
 
   redis:
-    image: redis:alpine
-    container_name: discord-mods-redis
-    ports:
-      - "6379:6379"
+    image: redis:7-alpine
     volumes:
       - redis_data:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    networks:
+      - internal_network
 
-  postgres:
-    build: ./postgres
-    container_name: discord-mods-postgres
-    ports:
-      - "5432:5432"
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A config worker -l INFO
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your-password}
-      POSTGRES_DB: discord_mods
-      POSTGRES_USER: postgres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_DEBUG=${DJANGO_DEBUG}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    depends_on:
+      - redis
+    networks:
+      - internal_network
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A config beat -l INFO
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_DEBUG=${DJANGO_DEBUG}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+    depends_on:
+      - redis
+    networks:
+      - internal_network
 
 volumes:
+  static_volume:
+  media_volume:
   redis_data:
-  postgres_data:
+
+networks:
+  web_network:
+    driver: bridge
+  internal_network:
+    driver: bridge
+    internal: true
