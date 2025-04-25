@@ -22,9 +22,20 @@ print_error() {
     echo -e "${RED}[-] $1${NC}"
 }
 
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    print_error "Please run as root"
+    exit 1
+fi
+
+# Get the actual username (not root)
+ACTUAL_USER=$(logname || echo ${SUDO_USER:-${USER}})
+print_status "Running setup for user: $ACTUAL_USER"
+
 # Generate environment file first
 print_status "Generating environment file..."
-cat > .env << EOL
+sudo -u $ACTUAL_USER bash << EOF
+cat > .env << 'EOL'
 # Web Configuration
 DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
 DJANGO_DEBUG=False
@@ -50,12 +61,13 @@ GITHUB_TOKEN=${GITHUB_TOKEN:-your_github_token}
 JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
 ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key}
 EOL
+EOF
 
 # Function to install package if not present
 install_if_missing() {
     if ! command -v $1 &> /dev/null; then
         print_status "Installing $1..."
-        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $2 || {
+        DEBIAN_FRONTEND=noninteractive apt-get install -y $2 || {
             print_error "Failed to install $1"
             exit 1
         }
@@ -66,11 +78,11 @@ install_if_missing() {
 
 # Update package list
 print_status "Updating package list..."
-sudo rm -f /var/lib/apt/lists/lock
-sudo rm -f /var/cache/apt/archives/lock
-sudo rm -f /var/lib/dpkg/lock*
-sudo dpkg --configure -a
-sudo DEBIAN_FRONTEND=noninteractive apt-get update
+rm -f /var/lib/apt/lists/lock
+rm -f /var/cache/apt/archives/lock
+rm -f /var/lib/dpkg/lock*
+dpkg --configure -a
+DEBIAN_FRONTEND=noninteractive apt-get update
 
 # Install Python3 if not present
 install_if_missing python3 "python3-full"
@@ -78,12 +90,14 @@ install_if_missing python3-venv "python3-venv"
 
 # Create and activate virtual environment
 print_status "Setting up Python virtual environment..."
+sudo -u $ACTUAL_USER bash << EOF
 python3 -m venv venv
 source venv/bin/activate
+EOF
 
 # Install required system packages
 print_status "Installing required packages..."
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+DEBIAN_FRONTEND=noninteractive apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -104,10 +118,10 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 if ! command -v docker &> /dev/null; then
     print_status "Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-    sudo usermod -aG docker $USER
-    sudo systemctl enable docker
-    sudo systemctl start docker
+    sh get-docker.sh
+    usermod -aG docker $ACTUAL_USER
+    systemctl enable docker
+    systemctl start docker
 else
     print_status "Docker is already installed"
 fi
@@ -115,30 +129,30 @@ fi
 # Install Docker Compose if not present
 if ! command -v docker-compose &> /dev/null; then
     print_status "Installing Docker Compose..."
-    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
+    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
 else
     print_status "Docker Compose is already installed"
 fi
 
 # Create necessary directories
 print_status "Creating project directories..."
-sudo mkdir -p /var/www/$DOMAIN/{static,media,logs,ssl,nginx/conf.d}
+mkdir -p /var/www/$DOMAIN/{static,media,logs,ssl,nginx/conf.d}
 
 # Set proper permissions
 print_status "Setting permissions..."
-sudo chown -R $USER:$USER /var/www/$DOMAIN
-sudo chmod -R 755 /var/www/$DOMAIN
+chown -R $ACTUAL_USER:$ACTUAL_USER /var/www/$DOMAIN
+chmod -R 755 /var/www/$DOMAIN
 
 # Configure firewall
 print_status "Configuring firewall..."
-sudo ufw allow 'Nginx Full'
-sudo ufw allow OpenSSH
-sudo ufw --force enable
+ufw allow 'Nginx Full'
+ufw allow OpenSSH
+ufw --force enable
 
 # Configure Nginx
 print_status "Configuring Nginx..."
-sudo bash -c "cat > /etc/nginx/conf.d/$DOMAIN.conf" << EOL
+cat > /etc/nginx/conf.d/$DOMAIN.conf << EOL
 upstream django {
     server web:8000;
 }
@@ -228,32 +242,38 @@ EOL
 
 # Install Python dependencies
 print_status "Installing Python dependencies..."
+sudo -u $ACTUAL_USER bash << EOF
+source venv/bin/activate
 pip install -r requirements.txt
+EOF
 
 # Obtain SSL certificate
 print_status "Obtaining SSL certificate..."
-sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email admin@lytestudios.be --redirect
+certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email admin@lytestudios.be --redirect
 
 # Setup auto-renewal for SSL
 print_status "Setting up SSL auto-renewal..."
-(sudo crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet") | sudo crontab -
+(crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet") | crontab -
 
 # Copy project files
 print_status "Copying project files..."
-sudo cp -r web/* /var/www/$DOMAIN/
-sudo cp .env /var/www/$DOMAIN/
+cp -r web/* /var/www/$DOMAIN/
+cp .env /var/www/$DOMAIN/
+chown -R $ACTUAL_USER:$ACTUAL_USER /var/www/$DOMAIN
 
 # Pull Docker images first
 print_status "Pulling Docker images..."
-sudo docker-compose -f docker-compose.prod.yml pull
+docker-compose -f docker-compose.prod.yml pull
 
 # Build and start Docker containers
 print_status "Starting Docker containers..."
-sudo docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose -f docker-compose.prod.yml up -d --build
 
 print_status "Setup completed successfully!"
 print_warning "Please ensure you have updated the .env file with your credentials"
 print_warning "Your site should be available at https://$DOMAIN"
 
 # Deactivate virtual environment
+sudo -u $ACTUAL_USER bash << EOF
 deactivate
+EOF
