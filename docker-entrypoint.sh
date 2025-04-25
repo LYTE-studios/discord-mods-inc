@@ -10,11 +10,11 @@ import sys
 import psycopg2
 try:
     psycopg2.connect(
-        dbname="${SUPABASE_DB_NAME}",
-        user="${SUPABASE_DB_USER}",
-        password="${SUPABASE_DB_PASSWORD}",
-        host="${SUPABASE_URL#*@}".split(':')[0],
-        port=5432,
+        dbname="${POSTGRES_DB}",
+        user="${POSTGRES_USER}",
+        password="${POSTGRES_PASSWORD}",
+        host="${POSTGRES_HOST}",
+        port="${POSTGRES_PORT}",
     )
 except psycopg2.OperationalError:
     sys.exit(-1)

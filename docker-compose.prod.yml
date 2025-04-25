@@ -14,11 +14,11 @@ services:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
       - DJANGO_DEBUG=${DJANGO_DEBUG}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - SUPABASE_URL=http://kong:8000
-      - SUPABASE_KEY=${SUPABASE_KEY}
-      - SUPABASE_DB_NAME=${SUPABASE_DB_NAME}
-      - SUPABASE_DB_USER=${SUPABASE_DB_USER}
-      - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -27,8 +27,7 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     depends_on:
       - redis
-      - postgres
-      - kong
+      - db
     networks:
       - web_network
       - internal_network
@@ -58,32 +57,15 @@ services:
     networks:
       - internal_network
 
-  # Supabase Stack
-  postgres:
+  db:
     image: postgres:14-alpine
     restart: always
-    environment:
-      POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD}
-      POSTGRES_DB: ${SUPABASE_DB_NAME}
     volumes:
-      - db_data:/var/lib/postgresql/data
-    networks:
-      - internal_network
-
-  kong:
-    image: kong:2.8.1-alpine
-    restart: always
+      - postgres_data:/var/lib/postgresql/data
     environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
-      KONG_DNS_ORDER: LAST,A,CNAME
-      KONG_PLUGINS: request-transformer,cors,key-auth,acl
-    volumes:
-      - ./kong.yml:/var/lib/kong/kong.yml:ro
-    ports:
-      - "8000:8000"
-    depends_on:
-      - postgres
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
     networks:
       - internal_network
 
@@ -109,15 +91,18 @@ services:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
       - DJANGO_DEBUG=${DJANGO_DEBUG}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - SUPABASE_URL=http://kong:8000
-      - SUPABASE_KEY=${SUPABASE_KEY}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
     depends_on:
       - redis
-      - postgres
+      - db
     networks:
       - internal_network
 
@@ -132,13 +117,16 @@ services:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
       - DJANGO_DEBUG=${DJANGO_DEBUG}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - SUPABASE_URL=http://kong:8000
-      - SUPABASE_KEY=${SUPABASE_KEY}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
     depends_on:
       - redis
-      - postgres
+      - db
     networks:
       - internal_network
 
@@ -146,7 +134,7 @@ volumes:
   static_volume:
   media_volume:
   redis_data:
-  db_data:
+  postgres_data:
 
 networks:
   web_network:

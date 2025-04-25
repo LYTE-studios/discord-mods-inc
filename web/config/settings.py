@@ -82,11 +82,11 @@ CHANNEL_LAYERS = {
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'HOST': os.environ.get('SUPABASE_URL', '').split('@')[1].split(':')[0] if os.environ.get('SUPABASE_URL') else 'localhost',
-        'NAME': os.environ.get('SUPABASE_DB_NAME', 'postgres'),
-        'USER': os.environ.get('SUPABASE_DB_USER', 'postgres'),
-        'PASSWORD': os.environ.get('SUPABASE_DB_PASSWORD', ''),
-        'PORT': '5432',
+        'NAME': os.environ.get('POSTGRES_DB', 'postgres'),
+        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
 }
 
@@ -155,9 +155,6 @@ SESSION_COOKIE_SECURE = not DEBUG
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/chat/'
 LOGOUT_REDIRECT_URL = '/login/'
-
-# Supabase settings
-SUPABASE_JWT_SECRET = os.environ.get('SUPABASE_JWT_SECRET')
 
 # OpenAI settings
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
