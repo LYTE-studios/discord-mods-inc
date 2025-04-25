@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Colors for output
 RED='\033[0;31m'
@@ -23,23 +23,20 @@ print_error() {
     echo -e "${RED}[-] $1${NC}"
 }
 
-# Check if running as root
+# Check if script is run with sudo
 if [ "$EUID" -ne 0 ]; then
-    print_error "Please run as root"
+    print_error "Please run with sudo: sudo bash $0"
     exit 1
 fi
 
 # Get the actual username
-ACTUAL_USER=$(who am i | awk '{print $1}')
-if [ -z "$ACTUAL_USER" ]; then
-    ACTUAL_USER=${SUDO_USER:-${USER}}
-fi
+ACTUAL_USER=${SUDO_USER:-${USER}}
 print_status "Running setup for user: $ACTUAL_USER"
 
 # Create project directory if it doesn't exist
 if [ ! -d "$PROJECT_DIR" ]; then
     mkdir -p "$PROJECT_DIR"
-    chown $ACTUAL_USER:$ACTUAL_USER "$PROJECT_DIR"
+    chown "$ACTUAL_USER:$ACTUAL_USER" "$PROJECT_DIR"
 fi
 
 # Stop existing nginx service
@@ -48,7 +45,7 @@ systemctl stop nginx || true
 
 # Generate environment file
 print_status "Generating environment file..."
-cat << 'EOL' | tee .env > /dev/null
+cat > .env << 'EOL'
 # Web Configuration
 DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
 DJANGO_DEBUG=False
@@ -76,14 +73,14 @@ ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key}
 EOL
 
 # Set proper permissions for .env
-chown $ACTUAL_USER:$ACTUAL_USER .env
+chown "$ACTUAL_USER:$ACTUAL_USER" .env
 chmod 600 .env
 
 # Function to install package if not present
 install_if_missing() {
-    if ! command -v $1 &> /dev/null; then
+    if ! command -v "$1" &> /dev/null; then
         print_status "Installing $1..."
-        DEBIAN_FRONTEND=noninteractive apt-get install -y $2 || {
+        DEBIAN_FRONTEND=noninteractive apt-get install -y "$2" || {
             print_error "Failed to install $1"
             exit 1
         }
@@ -107,10 +104,10 @@ install_if_missing python3-pip "python3-pip"
 
 # Create and activate virtual environment
 print_status "Setting up Python virtual environment..."
-cd "$PROJECT_DIR"
+cd "$PROJECT_DIR" || exit
 rm -rf venv
-runuser -l $ACTUAL_USER -c "cd $PROJECT_DIR && python3 -m venv venv"
-chown -R $ACTUAL_USER:$ACTUAL_USER venv
+sudo -u "$ACTUAL_USER" python3 -m venv venv
+chown -R "$ACTUAL_USER:$ACTUAL_USER" venv
 
 # Install required system packages
 print_status "Installing required packages..."
@@ -132,13 +129,13 @@ if ! command -v docker &> /dev/null; then
     print_status "Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
     sh get-docker.sh
-    usermod -aG docker $ACTUAL_USER
+    usermod -aG docker "$ACTUAL_USER"
     systemctl enable docker
     systemctl start docker
 else
     print_status "Docker is already installed"
     # Ensure user is in docker group
-    usermod -aG docker $ACTUAL_USER
+    usermod -aG docker "$ACTUAL_USER"
 fi
 
 # Install Docker Compose if not present
@@ -152,12 +149,12 @@ fi
 
 # Create necessary directories
 print_status "Creating project directories..."
-mkdir -p /var/www/$DOMAIN/{static,media,logs,ssl,nginx/conf.d}
+mkdir -p "/var/www/$DOMAIN"/{static,media,logs,ssl,nginx/conf.d}
 
 # Set proper permissions
 print_status "Setting permissions..."
-chown -R $ACTUAL_USER:$ACTUAL_USER /var/www/$DOMAIN
-chmod -R 755 /var/www/$DOMAIN
+chown -R "$ACTUAL_USER:$ACTUAL_USER" "/var/www/$DOMAIN"
+chmod -R 755 "/var/www/$DOMAIN"
 
 # Configure firewall
 print_status "Configuring firewall..."
@@ -167,19 +164,19 @@ ufw --force enable
 
 # Install Python dependencies
 print_status "Installing Python dependencies..."
-runuser -l $ACTUAL_USER -c "cd $PROJECT_DIR && . ./venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt && deactivate"
+sudo -u "$ACTUAL_USER" bash -c "cd $PROJECT_DIR && source venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt && deactivate"
 
 # Stop and remove any existing containers
 print_status "Cleaning up existing containers..."
-runuser -l $ACTUAL_USER -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml down --remove-orphans"
+sudo -u "$ACTUAL_USER" bash -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml down --remove-orphans"
 
 # Pull Docker images first
 print_status "Pulling Docker images..."
-runuser -l $ACTUAL_USER -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml pull"
+sudo -u "$ACTUAL_USER" bash -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml pull"
 
 # Build and start Docker containers
 print_status "Starting Docker containers..."
-runuser -l $ACTUAL_USER -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml up -d --build"
+sudo -u "$ACTUAL_USER" bash -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml up -d --build"
 
 # Wait for web container to be ready
 print_status "Waiting for web container to be ready..."
@@ -187,12 +184,12 @@ sleep 10
 
 # Configure initial Nginx for HTTP
 print_status "Configuring initial Nginx for HTTP..."
-tee /etc/nginx/conf.d/rate_limiting.conf > /dev/null << 'EOL'
+cat > /etc/nginx/conf.d/rate_limiting.conf << 'EOL'
 limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
 EOL
 
 # Configure HTTP-only first
-tee /etc/nginx/conf.d/$DOMAIN.conf > /dev/null << EOL
+cat > "/etc/nginx/conf.d/$DOMAIN.conf" << EOL
 upstream django {
     server localhost:8000;
 }
@@ -253,7 +250,7 @@ print_status "Setup completed successfully!"
 print_warning "Please ensure you have:"
 print_warning "1. Updated the .env file with your credentials"
 print_warning "2. Set up DNS records for $DOMAIN pointing to this server"
-print_warning "3. Once DNS is propagated, run: certbot --nginx -d $DOMAIN"
+print_warning "3. Once DNS is propagated, run: sudo certbot --nginx -d $DOMAIN"
 print_warning "Your site is available at http://$DOMAIN"
 print_warning "After DNS propagation, run certbot to enable HTTPS"
 print_warning "Please log out and back in for Docker permissions to take effect"
