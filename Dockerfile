@@ -1,18 +1,8 @@
-# Use an official Python runtime as a parent image
 FROM python:3.11-slim-bullseye
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    # pip
-    PIP_NO_CACHE_DIR=off \
-    PIP_DISABLE_PIP_VERSION_CHECK=on \
-    PIP_DEFAULT_TIMEOUT=100 \
-    # Poetry
-    POETRY_VERSION=1.4.2 \
-    # Paths
-    PYSETUP_PATH="/opt/pysetup" \
-    VENV_PATH="/opt/pysetup/.venv"
+    PYTHONUNBUFFERED=1
 
 # System dependencies
 RUN apt-get update \
@@ -30,15 +20,13 @@ WORKDIR /app
 RUN addgroup --system web \
     && adduser --system --ingroup web web
 
-# Install Python dependencies
+# Copy requirements first for better caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
-COPY --chown=web:web . .
-
-# Copy the entrypoint script
-COPY --chown=web:web docker-entrypoint.sh /usr/local/bin/
+# Copy Django project files
+COPY web/ .
+COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Create necessary directories and set permissions
@@ -54,5 +42,5 @@ EXPOSE 8000
 # Set the entrypoint script
 ENTRYPOINT ["docker-entrypoint.sh"]
 
-# Default command (can be overridden in docker-compose)
+# Default command
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120", "config.wsgi:application"]

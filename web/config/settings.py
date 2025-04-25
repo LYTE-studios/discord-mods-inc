@@ -72,7 +72,8 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [(os.environ.get('REDIS_HOST', 'localhost'), 6379)],
+            "hosts": [(os.environ.get('REDIS_HOST', 'localhost'), 
+                      int(os.environ.get('REDIS_PORT', 6379)))],
         },
     },
 }
@@ -121,6 +122,10 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
+# Media files
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -138,6 +143,7 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    f"https://{os.environ.get('DOMAIN')}",
 ]
 
 # Session settings
@@ -152,3 +158,21 @@ LOGOUT_REDIRECT_URL = '/login/'
 
 # Supabase settings
 SUPABASE_JWT_SECRET = os.environ.get('SUPABASE_JWT_SECRET')
+
+# OpenAI settings
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4')
+OPENAI_MAX_TOKENS = int(os.environ.get('OPENAI_MAX_TOKENS', 1000))
+OPENAI_TEMPERATURE = float(os.environ.get('OPENAI_TEMPERATURE', 0.7))
+
+# GitHub settings
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
+
+# Security settings
+SECURE_SSL_REDIRECT = not DEBUG
+SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'

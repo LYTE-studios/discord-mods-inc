@@ -151,6 +151,35 @@ pip install --upgrade pip
 pip install -r requirements.txt
 deactivate
 
+# Set up Django project structure
+print_status "Setting up Django project structure..."
+mkdir -p web/{config,chat,users,templates,static}
+mkdir -p web/templates/{chat,users}
+mkdir -p web/static/{css,js}
+
+# Copy existing modules to Django project
+cp -r ai web/ai
+cp -r cogs web/cogs
+cp -r database web/database
+cp -r github web/github
+cp -r monitoring web/monitoring
+cp -r security web/security
+cp -r tickets web/tickets
+cp -r utils web/utils
+cp -r workflow web/workflow
+
+# Copy configuration files
+cp config.py web/config/settings.py
+cp requirements.txt web/
+
+# Create Django project files
+chmod +x web/manage.py
+
+# Create __init__.py files
+touch web/config/__init__.py
+touch web/chat/__init__.py
+touch web/users/__init__.py
+
 # Stop and remove any existing containers
 print_status "Cleaning up existing containers..."
 docker-compose -f docker-compose.prod.yml down --remove-orphans

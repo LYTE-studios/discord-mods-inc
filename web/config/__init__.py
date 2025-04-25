@@ -1,1 +1,1 @@
-# Django project configuration package
+# Django configuration package
