@@ -23,25 +23,19 @@ print_error() {
     echo -e "${RED}[-] $1${NC}"
 }
 
-# Check if script is run with sudo
-if [ "$EUID" -ne 0 ]; then
-    print_error "Please run with sudo: sudo bash $0"
     exit 1
-fi
-
-# Get the actual username
-ACTUAL_USER=${SUDO_USER:-${USER}}
-print_status "Running setup for user: $ACTUAL_USER"
+# Get username
+USERNAME=$(whoami)
+print_status "Running setup for user: $USERNAME"
 
 # Create project directory if it doesn't exist
 if [ ! -d "$PROJECT_DIR" ]; then
     mkdir -p "$PROJECT_DIR"
-    chown "$ACTUAL_USER:$ACTUAL_USER" "$PROJECT_DIR"
 fi
 
 # Stop existing nginx service
 print_status "Stopping existing nginx service..."
-systemctl stop nginx || true
+sudo systemctl stop nginx || true
 
 # Generate environment file
 print_status "Generating environment file..."
@@ -72,15 +66,13 @@ JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
 ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key}
 EOL
 
-# Set proper permissions for .env
-chown "$ACTUAL_USER:$ACTUAL_USER" .env
 chmod 600 .env
 
 # Function to install package if not present
 install_if_missing() {
     if ! command -v "$1" &> /dev/null; then
         print_status "Installing $1..."
-        DEBIAN_FRONTEND=noninteractive apt-get install -y "$2" || {
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$2" || {
             print_error "Failed to install $1"
             exit 1
         }
@@ -91,11 +83,7 @@ install_if_missing() {
 
 # Update package list
 print_status "Updating package list..."
-rm -f /var/lib/apt/lists/lock
-rm -f /var/cache/apt/archives/lock
-rm -f /var/lib/dpkg/lock*
-dpkg --configure -a
-DEBIAN_FRONTEND=noninteractive apt-get update
+sudo apt-get update
 
 # Install Python3 if not present
 install_if_missing python3 "python3-full"
@@ -106,12 +94,11 @@ install_if_missing python3-pip "python3-pip"
 print_status "Setting up Python virtual environment..."
 cd "$PROJECT_DIR" || exit
 rm -rf venv
-sudo -u "$ACTUAL_USER" python3 -m venv venv
-chown -R "$ACTUAL_USER:$ACTUAL_USER" venv
+python3 -m venv venv
 
 # Install required system packages
 print_status "Installing required packages..."
-DEBIAN_FRONTEND=noninteractive apt-get install -y \
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -128,55 +115,54 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
 if ! command -v docker &> /dev/null; then
     print_status "Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
-    usermod -aG docker "$ACTUAL_USER"
-    systemctl enable docker
-    systemctl start docker
+    sudo sh get-docker.sh
+    sudo usermod -aG docker "$USERNAME"
+    sudo systemctl enable docker
+    sudo systemctl start docker
 else
     print_status "Docker is already installed"
     # Ensure user is in docker group
-    usermod -aG docker "$ACTUAL_USER"
+    sudo usermod -aG docker "$USERNAME"
 fi
 
 # Install Docker Compose if not present
 if ! command -v docker-compose &> /dev/null; then
     print_status "Installing Docker Compose..."
-    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
+    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
 else
     print_status "Docker Compose is already installed"
 fi
 
 # Create necessary directories
 print_status "Creating project directories..."
-mkdir -p "/var/www/$DOMAIN"/{static,media,logs,ssl,nginx/conf.d}
-
-# Set proper permissions
-print_status "Setting permissions..."
-chown -R "$ACTUAL_USER:$ACTUAL_USER" "/var/www/$DOMAIN"
-chmod -R 755 "/var/www/$DOMAIN"
+sudo mkdir -p "/var/www/$DOMAIN"/{static,media,logs,ssl,nginx/conf.d}
+sudo chown -R "$USERNAME:$USERNAME" "/var/www/$DOMAIN"
 
 # Configure firewall
 print_status "Configuring firewall..."
-ufw allow 'Nginx Full'
-ufw allow OpenSSH
-ufw --force enable
+sudo ufw allow 'Nginx Full'
+sudo ufw allow OpenSSH
+sudo ufw --force enable
 
 # Install Python dependencies
 print_status "Installing Python dependencies..."
-sudo -u "$ACTUAL_USER" bash -c "cd $PROJECT_DIR && source venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt && deactivate"
+. ./venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+deactivate
 
 # Stop and remove any existing containers
 print_status "Cleaning up existing containers..."
-sudo -u "$ACTUAL_USER" bash -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml down --remove-orphans"
+docker-compose -f docker-compose.prod.yml down --remove-orphans
 
 # Pull Docker images first
 print_status "Pulling Docker images..."
-sudo -u "$ACTUAL_USER" bash -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml pull"
+docker-compose -f docker-compose.prod.yml pull
 
 # Build and start Docker containers
 print_status "Starting Docker containers..."
-sudo -u "$ACTUAL_USER" bash -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml up -d --build"
+docker-compose -f docker-compose.prod.yml up -d --build
 
 # Wait for web container to be ready
 print_status "Waiting for web container to be ready..."
@@ -184,12 +170,12 @@ sleep 10
 
 # Configure initial Nginx for HTTP
 print_status "Configuring initial Nginx for HTTP..."
-cat > /etc/nginx/conf.d/rate_limiting.conf << 'EOL'
+sudo tee /etc/nginx/conf.d/rate_limiting.conf > /dev/null << 'EOL'
 limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
 EOL
 
 # Configure HTTP-only first
-cat > "/etc/nginx/conf.d/$DOMAIN.conf" << EOL
+sudo tee "/etc/nginx/conf.d/$DOMAIN.conf" > /dev/null << EOL
 upstream django {
     server localhost:8000;
 }
@@ -243,8 +229,14 @@ EOL
 
 # Start and test Nginx
 print_status "Starting and testing Nginx..."
-systemctl start nginx
-nginx -t && systemctl reload nginx
+sudo systemctl start nginx
+sudo nginx -t && sudo systemctl reload nginx
+
+# Copy project files
+print_status "Copying project files..."
+sudo cp -r web/* "/var/www/$DOMAIN/"
+sudo cp .env "/var/www/$DOMAIN/"
+sudo chown -R "$USERNAME:$USERNAME" "/var/www/$DOMAIN"
 
 print_status "Setup completed successfully!"
 print_warning "Please ensure you have:"
