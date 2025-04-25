@@ -60,28 +60,13 @@ services:
 
   # Supabase Stack
   postgres:
-    image: supabase/postgres:15.1.0.117
+    image: postgres:14-alpine
     restart: always
     environment:
       POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD}
       POSTGRES_DB: ${SUPABASE_DB_NAME}
     volumes:
       - db_data:/var/lib/postgresql/data
-    networks:
-      - internal_network
-
-  studio:
-    image: supabase/studio:20230320-4cccfe3
-    restart: always
-    environment:
-      STUDIO_PG_META_URL: http://meta:8080
-      SUPABASE_URL: http://kong:8000
-      SUPABASE_REST_URL: http://kong:8000/rest/v1/
-      SUPABASE_PUBLIC_URL: http://localhost:8000
-      SUPABASE_ANON_KEY: ${SUPABASE_KEY}
-    depends_on:
-      - postgres
-      - kong
     networks:
       - internal_network
 
@@ -97,18 +82,6 @@ services:
       - ./kong.yml:/var/lib/kong/kong.yml:ro
     ports:
       - "8000:8000"
-    depends_on:
-      - postgres
-    networks:
-      - internal_network
-
-  meta:
-    image: supabase/postgres-meta:v0.68.0
-    restart: always
-    environment:
-      PG_META_PORT: 8080
-      PG_META_DB_HOST: postgres
-      PG_META_DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
     depends_on:
       - postgres
     networks:

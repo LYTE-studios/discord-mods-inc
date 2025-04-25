@@ -22,6 +22,35 @@ print_error() {
     echo -e "${RED}[-] $1${NC}"
 }
 
+# Generate environment file first
+print_status "Generating environment file..."
+cat > .env << EOL
+# Web Configuration
+DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
+DJANGO_DEBUG=False
+ALLOWED_HOSTS=$DOMAIN
+DOMAIN=$DOMAIN
+
+# Database settings
+SUPABASE_DB_NAME=postgres
+SUPABASE_DB_USER=postgres
+SUPABASE_DB_PASSWORD=super_secret_db_password_123
+SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNTE2MjM5MDIyfQ.vZ7BeGD5k7RAVbXkGh-SuH9tGjhLrCuKn1W3e_Zf8tc
+
+# Redis settings
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# SSL settings
+SSL_EMAIL=admin@lytestudios.be
+
+# Other settings
+OPENAI_API_KEY=${OPENAI_API_KEY:-your_openai_key}
+GITHUB_TOKEN=${GITHUB_TOKEN:-your_github_token}
+JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
+ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key}
+EOL
+
 # Function to install package if not present
 install_if_missing() {
     if ! command -v $1 &> /dev/null; then
@@ -44,9 +73,13 @@ sudo dpkg --configure -a
 sudo DEBIAN_FRONTEND=noninteractive apt-get update
 
 # Install Python3 if not present
-install_if_missing python3 "python3"
-install_if_missing pip3 "python3-pip"
+install_if_missing python3 "python3-full"
 install_if_missing python3-venv "python3-venv"
+
+# Create and activate virtual environment
+print_status "Setting up Python virtual environment..."
+python3 -m venv venv
+source venv/bin/activate
 
 # Install required system packages
 print_status "Installing required packages..."
@@ -102,37 +135,6 @@ print_status "Configuring firewall..."
 sudo ufw allow 'Nginx Full'
 sudo ufw allow OpenSSH
 sudo ufw --force enable
-
-# Generate environment file if not exists
-if [ ! -f .env ]; then
-    print_status "Generating environment file..."
-    cat > .env << EOL
-DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
-DJANGO_DEBUG=False
-ALLOWED_HOSTS=$DOMAIN
-DOMAIN=$DOMAIN
-
-# Database settings
-SUPABASE_DB_NAME=postgres
-SUPABASE_DB_USER=postgres
-SUPABASE_DB_PASSWORD=super_secret_db_password_123
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNTE2MjM5MDIyfQ.vZ7BeGD5k7RAVbXkGh-SuH9tGjhLrCuKn1W3e_Zf8tc
-
-# Redis settings
-REDIS_HOST=redis
-REDIS_PORT=6379
-
-# SSL settings
-SSL_EMAIL=admin@lytestudios.be
-
-# Other settings
-OPENAI_API_KEY=${OPENAI_API_KEY:-your_openai_key}
-GITHUB_TOKEN=${GITHUB_TOKEN:-your_github_token}
-JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
-ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key}
-EOL
-    print_warning "Please edit .env file with your actual credentials"
-fi
 
 # Configure Nginx
 print_status "Configuring Nginx..."
@@ -226,11 +228,11 @@ EOL
 
 # Install Python dependencies
 print_status "Installing Python dependencies..."
-sudo pip3 install -r requirements.txt
+pip install -r requirements.txt
 
 # Obtain SSL certificate
 print_status "Obtaining SSL certificate..."
-sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email $(grep SSL_EMAIL .env | cut -d '=' -f2) --redirect
+sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email admin@lytestudios.be --redirect
 
 # Setup auto-renewal for SSL
 print_status "Setting up SSL auto-renewal..."
@@ -241,6 +243,10 @@ print_status "Copying project files..."
 sudo cp -r web/* /var/www/$DOMAIN/
 sudo cp .env /var/www/$DOMAIN/
 
+# Pull Docker images first
+print_status "Pulling Docker images..."
+sudo docker-compose -f docker-compose.prod.yml pull
+
 # Build and start Docker containers
 print_status "Starting Docker containers..."
 sudo docker-compose -f docker-compose.prod.yml up -d --build
@@ -248,3 +254,6 @@ sudo docker-compose -f docker-compose.prod.yml up -d --build
 print_status "Setup completed successfully!"
 print_warning "Please ensure you have updated the .env file with your credentials"
 print_warning "Your site should be available at https://$DOMAIN"
+
+# Deactivate virtual environment
+deactivate
