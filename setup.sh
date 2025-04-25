@@ -22,20 +22,20 @@ print_error() {
     echo -e "${RED}[-] $1${NC}"
 }
 
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then
-    print_error "Please run as root"
-    exit 1
+# Get the actual username
+ACTUAL_USER=$(who am i | awk '{print $1}')
+if [ -z "$ACTUAL_USER" ]; then
+    ACTUAL_USER=${SUDO_USER:-${USER}}
 fi
-
-# Get the actual username (not root)
-ACTUAL_USER=$(logname || echo ${SUDO_USER:-${USER}})
 print_status "Running setup for user: $ACTUAL_USER"
 
-# Generate environment file first
+# Create a temporary directory for our setup
+TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
+# Generate environment file in temp directory first
 print_status "Generating environment file..."
-sudo -u $ACTUAL_USER bash << EOF
-cat > .env << 'EOL'
+cat > "$TEMP_DIR/.env" << EOL
 # Web Configuration
 DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
 DJANGO_DEBUG=False
@@ -61,13 +61,17 @@ GITHUB_TOKEN=${GITHUB_TOKEN:-your_github_token}
 JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
 ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key}
 EOL
-EOF
+
+# Copy .env file to project directory with correct permissions
+cp "$TEMP_DIR/.env" ./.env
+chown $ACTUAL_USER:$ACTUAL_USER ./.env
+chmod 600 ./.env
 
 # Function to install package if not present
 install_if_missing() {
     if ! command -v $1 &> /dev/null; then
         print_status "Installing $1..."
-        DEBIAN_FRONTEND=noninteractive apt-get install -y $2 || {
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $2 || {
             print_error "Failed to install $1"
             exit 1
         }
@@ -78,11 +82,11 @@ install_if_missing() {
 
 # Update package list
 print_status "Updating package list..."
-rm -f /var/lib/apt/lists/lock
-rm -f /var/cache/apt/archives/lock
-rm -f /var/lib/dpkg/lock*
-dpkg --configure -a
-DEBIAN_FRONTEND=noninteractive apt-get update
+sudo rm -f /var/lib/apt/lists/lock
+sudo rm -f /var/cache/apt/archives/lock
+sudo rm -f /var/lib/dpkg/lock*
+sudo dpkg --configure -a
+sudo DEBIAN_FRONTEND=noninteractive apt-get update
 
 # Install Python3 if not present
 install_if_missing python3 "python3-full"
@@ -90,14 +94,13 @@ install_if_missing python3-venv "python3-venv"
 
 # Create and activate virtual environment
 print_status "Setting up Python virtual environment..."
-sudo -u $ACTUAL_USER bash << EOF
-python3 -m venv venv
-source venv/bin/activate
-EOF
+if [ ! -d "venv" ]; then
+    sudo -u $ACTUAL_USER python3 -m venv venv
+fi
 
 # Install required system packages
 print_status "Installing required packages..."
-DEBIAN_FRONTEND=noninteractive apt-get install -y \
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -108,72 +111,70 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ufw \
     git \
     build-essential \
-    libpq-dev \
-    || {
-        print_error "Failed to install required packages"
-        exit 1
-    }
+    libpq-dev
 
 # Install Docker if not present
 if ! command -v docker &> /dev/null; then
     print_status "Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
-    usermod -aG docker $ACTUAL_USER
-    systemctl enable docker
-    systemctl start docker
+    sudo sh get-docker.sh
+    sudo usermod -aG docker $ACTUAL_USER
+    sudo systemctl enable docker
+    sudo systemctl start docker
 else
     print_status "Docker is already installed"
+    # Ensure user is in docker group
+    sudo usermod -aG docker $ACTUAL_USER
 fi
 
 # Install Docker Compose if not present
 if ! command -v docker-compose &> /dev/null; then
     print_status "Installing Docker Compose..."
-    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
+    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
 else
     print_status "Docker Compose is already installed"
 fi
 
 # Create necessary directories
 print_status "Creating project directories..."
-mkdir -p /var/www/$DOMAIN/{static,media,logs,ssl,nginx/conf.d}
+sudo mkdir -p /var/www/$DOMAIN/{static,media,logs,ssl,nginx/conf.d}
 
 # Set proper permissions
 print_status "Setting permissions..."
-chown -R $ACTUAL_USER:$ACTUAL_USER /var/www/$DOMAIN
-chmod -R 755 /var/www/$DOMAIN
+sudo chown -R $ACTUAL_USER:$ACTUAL_USER /var/www/$DOMAIN
+sudo chmod -R 755 /var/www/$DOMAIN
 
 # Configure firewall
 print_status "Configuring firewall..."
-ufw allow 'Nginx Full'
-ufw allow OpenSSH
-ufw --force enable
+sudo ufw allow 'Nginx Full'
+sudo ufw allow OpenSSH
+sudo ufw --force enable
 
 # Configure Nginx
 print_status "Configuring Nginx..."
-cat > /etc/nginx/conf.d/$DOMAIN.conf << EOL
+sudo bash -c "cat > /etc/nginx/conf.d/$DOMAIN.conf" << 'EOL'
 upstream django {
     server web:8000;
 }
 
-map \$http_upgrade \$connection_upgrade {
+map $http_upgrade $connection_upgrade {
     default upgrade;
     '' close;
 }
 
 server {
     listen 80;
-    server_name $DOMAIN;
-    return 301 https://\$server_name\$request_uri;
+    server_name gideon.lytestudios.be;
+    return 301 https://$server_name$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name $DOMAIN;
+    server_name gideon.lytestudios.be;
 
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/gideon.lytestudios.be/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gideon.lytestudios.be/privkey.pem;
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:50m;
     ssl_session_tickets off;
@@ -182,9 +183,6 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
     ssl_prefer_server_ciphers off;
-
-    # HSTS (uncomment if you're sure)
-    # add_header Strict-Transport-Security "max-age=63072000" always;
 
     # OCSP Stapling
     ssl_stapling on;
@@ -200,27 +198,27 @@ server {
     add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
 
     # Logs
-    access_log /var/www/$DOMAIN/logs/nginx-access.log;
-    error_log /var/www/$DOMAIN/logs/nginx-error.log;
+    access_log /var/www/gideon.lytestudios.be/logs/nginx-access.log;
+    error_log /var/www/gideon.lytestudios.be/logs/nginx-error.log;
 
     # Proxy settings
     location / {
         proxy_pass http://django;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
 
         # WebSocket support
         proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \$connection_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
         proxy_read_timeout 86400;
     }
 
     # Static files
     location /static/ {
-        alias /var/www/$DOMAIN/static/;
+        alias /var/www/gideon.lytestudios.be/static/;
         expires 1y;
         access_log off;
         add_header Cache-Control "public";
@@ -228,14 +226,14 @@ server {
 
     # Media files
     location /media/ {
-        alias /var/www/$DOMAIN/media/;
+        alias /var/www/gideon.lytestudios.be/media/;
         expires 1y;
         access_log off;
         add_header Cache-Control "public";
     }
 
     # Rate limiting
-    limit_req_zone \$binary_remote_addr zone=one:10m rate=1r/s;
+    limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
     limit_req zone=one burst=10 nodelay;
 }
 EOL
@@ -245,35 +243,31 @@ print_status "Installing Python dependencies..."
 sudo -u $ACTUAL_USER bash << EOF
 source venv/bin/activate
 pip install -r requirements.txt
+deactivate
 EOF
 
 # Obtain SSL certificate
 print_status "Obtaining SSL certificate..."
-certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email admin@lytestudios.be --redirect
+sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email admin@lytestudios.be --redirect
 
 # Setup auto-renewal for SSL
 print_status "Setting up SSL auto-renewal..."
-(crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet") | crontab -
+(sudo crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet") | sudo crontab -
 
 # Copy project files
 print_status "Copying project files..."
-cp -r web/* /var/www/$DOMAIN/
-cp .env /var/www/$DOMAIN/
-chown -R $ACTUAL_USER:$ACTUAL_USER /var/www/$DOMAIN
+sudo cp -r web/* /var/www/$DOMAIN/
+sudo cp .env /var/www/$DOMAIN/
+sudo chown -R $ACTUAL_USER:$ACTUAL_USER /var/www/$DOMAIN
 
 # Pull Docker images first
 print_status "Pulling Docker images..."
-docker-compose -f docker-compose.prod.yml pull
+sudo -u $ACTUAL_USER docker-compose -f docker-compose.prod.yml pull
 
 # Build and start Docker containers
 print_status "Starting Docker containers..."
-docker-compose -f docker-compose.prod.yml up -d --build
+sudo -u $ACTUAL_USER docker-compose -f docker-compose.prod.yml up -d --build
 
 print_status "Setup completed successfully!"
 print_warning "Please ensure you have updated the .env file with your credentials"
 print_warning "Your site should be available at https://$DOMAIN"
-
-# Deactivate virtual environment
-sudo -u $ACTUAL_USER bash << EOF
-deactivate
-EOF
