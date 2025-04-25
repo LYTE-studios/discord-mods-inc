@@ -97,7 +97,7 @@ install_if_missing python3-pip "python3-pip"
 print_status "Setting up Python virtual environment..."
 cd $PROJECT_DIR
 sudo rm -rf venv
-python3 -m venv venv
+sudo -u $ACTUAL_USER python3 -m venv venv
 sudo chown -R $ACTUAL_USER:$ACTUAL_USER venv
 
 # Install required system packages
@@ -155,10 +155,12 @@ sudo ufw --force enable
 
 # Install Python dependencies
 print_status "Installing Python dependencies..."
-source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-deactivate
+sudo -u $ACTUAL_USER bash -c "
+    . ./venv/bin/activate
+    pip install --upgrade pip
+    pip install -r requirements.txt
+    deactivate
+"
 
 # Stop and remove any existing containers
 print_status "Cleaning up existing containers..."
@@ -178,6 +180,13 @@ sleep 10
 
 # Configure Nginx
 print_status "Configuring Nginx..."
+
+# First, add rate limiting to http context
+sudo tee /etc/nginx/conf.d/rate_limiting.conf > /dev/null << 'EOL'
+limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
+EOL
+
+# Then configure the server
 sudo tee /etc/nginx/conf.d/$DOMAIN.conf > /dev/null << 'EOL'
 upstream django {
     server localhost:8000;
@@ -228,6 +237,7 @@ server {
 
     # Proxy settings
     location / {
+        limit_req zone=one burst=10 nodelay;
         proxy_pass http://django;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -256,12 +266,11 @@ server {
         access_log off;
         add_header Cache-Control "public";
     }
-
-    # Rate limiting
-    limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
-    limit_req zone=one burst=10 nodelay;
 }
 EOL
+
+# Test Nginx configuration
+sudo nginx -t
 
 # Obtain SSL certificate
 print_status "Obtaining SSL certificate..."
