@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: pytest
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DJANGO_SECRET_KEY=test_key
+      - DJANGO_DEBUG=True
+      - ALLOWED_HOSTS=localhost,127.0.0.1
+      - POSTGRES_DB=gideon
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=0~cySne?(Ts4a~qD_)nLC:8?qKcZ
+      - POSTGRES_HOST=framer-api.cd4qc66im6mq.eu-central-1.rds.amazonaws.com
+      - POSTGRES_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

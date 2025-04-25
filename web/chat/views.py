@@ -1,52 +1,51 @@
-from django.shortcuts import render, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.conf import settings
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
 from .models import Conversation, Message
+from .serializers import ConversationSerializer, MessageSerializer
 
-@login_required
-def chat_room(request, conversation_id=None):
-    # Get or create conversation
-    if conversation_id:
-        conversation = get_object_or_404(
-            Conversation, 
-            id=conversation_id,
-            user=request.user
-        )
-    else:
-        conversation = Conversation.objects.create(
-            user=request.user,
-            title=f"New Conversation {request.user.conversations.count() + 1}"
-        )
+class ConversationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing conversations.
+    """
+    serializer_class = ConversationSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-    # Get messages for this conversation
-    messages = conversation.messages.all()
+    def get_queryset(self):
+        """
+        Get conversations for the current user.
+        """
+        return Conversation.objects.filter(user=self.request.user)
 
-    # Get current ticket if any
-    current_ticket = None
-    latest_ticket_message = messages.filter(ticket_id__isnull=False).last()
-    if latest_ticket_message:
-        current_ticket = {
-            'id': latest_ticket_message.ticket_id,
-            'status': 'Active',  # This would come from your ticket system
-            'title': 'Current Task',  # This would come from your ticket system
-            'description': 'Working on current task...',  # This would come from your ticket system
-            'assignee': 'AI Team'  # This would come from your ticket system
-        }
+    def perform_create(self, serializer):
+        """
+        Create a new conversation for the current user.
+        """
+        serializer.save(user=self.request.user)
 
-    # WebSocket URL
-    websocket_protocol = 'wss' if request.is_secure() else 'ws'
-    websocket_url = f"{websocket_protocol}://{request.get_host()}/ws/chat/{conversation.id}/"
+    @action(detail=True, methods=['post'])
+    def send_message(self, request, pk=None):
+        """
+        Send a message in the conversation.
+        """
+        conversation = self.get_object()
+        serializer = MessageSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            serializer.save(
+                conversation=conversation,
+                user=request.user
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    context = {
-        'conversation': conversation,
-        'messages': messages,
-        'current_ticket': current_ticket,
-        'websocket_url': websocket_url,
-    }
-
-    return render(request, 'chat/room.html', context)
-
-@login_required
-def conversation_list(request):
-    conversations = request.user.conversations.all()
-    return render(request, 'chat/list.html', {'conversations': conversations})
+    @action(detail=True, methods=['get'])
+    def messages(self, request, pk=None):
+        """
+        Get all messages in a conversation.
+        """
+        conversation = self.get_object()
+        messages = Message.objects.filter(conversation=conversation)
+        serializer = MessageSerializer(messages, many=True)
+        return Response(serializer.data)
