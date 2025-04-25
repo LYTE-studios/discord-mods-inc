@@ -29,18 +29,14 @@ if [ -z "$ACTUAL_USER" ]; then
 fi
 print_status "Running setup for user: $ACTUAL_USER"
 
-# Create a temporary directory for our setup
-TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TEMP_DIR"' EXIT
-
-# Generate environment file in temp directory first
+# Generate environment file
 print_status "Generating environment file..."
-cat > "$TEMP_DIR/.env" << EOL
+cat << 'EOL' | sudo tee .env > /dev/null
 # Web Configuration
 DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
 DJANGO_DEBUG=False
-ALLOWED_HOSTS=$DOMAIN
-DOMAIN=$DOMAIN
+ALLOWED_HOSTS=gideon.lytestudios.be
+DOMAIN=gideon.lytestudios.be
 
 # Database settings
 SUPABASE_DB_NAME=postgres
@@ -62,10 +58,9 @@ JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
 ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key}
 EOL
 
-# Copy .env file to project directory with correct permissions
-cp "$TEMP_DIR/.env" ./.env
-chown $ACTUAL_USER:$ACTUAL_USER ./.env
-chmod 600 ./.env
+# Set proper permissions for .env
+sudo chown $ACTUAL_USER:$ACTUAL_USER .env
+sudo chmod 600 .env
 
 # Function to install package if not present
 install_if_missing() {
@@ -153,7 +148,7 @@ sudo ufw --force enable
 
 # Configure Nginx
 print_status "Configuring Nginx..."
-sudo bash -c "cat > /etc/nginx/conf.d/$DOMAIN.conf" << 'EOL'
+sudo tee /etc/nginx/conf.d/$DOMAIN.conf > /dev/null << 'EOL'
 upstream django {
     server web:8000;
 }
