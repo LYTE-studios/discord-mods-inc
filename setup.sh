@@ -8,6 +8,7 @@ NC='\033[0m' # No Color
 
 # Domain name
 DOMAIN="gideon.lytestudios.be"
+PROJECT_DIR="/home/ubuntu/discord-mods-inc"
 
 # Function to print status messages
 print_status() {
@@ -28,6 +29,10 @@ if [ -z "$ACTUAL_USER" ]; then
     ACTUAL_USER=${SUDO_USER:-${USER}}
 fi
 print_status "Running setup for user: $ACTUAL_USER"
+
+# Stop existing nginx service
+print_status "Stopping existing nginx service..."
+sudo systemctl stop nginx
 
 # Generate environment file
 print_status "Generating environment file..."
@@ -86,12 +91,14 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get update
 # Install Python3 if not present
 install_if_missing python3 "python3-full"
 install_if_missing python3-venv "python3-venv"
+install_if_missing python3-pip "python3-pip"
 
 # Create and activate virtual environment
 print_status "Setting up Python virtual environment..."
-if [ ! -d "venv" ]; then
-    sudo -u $ACTUAL_USER python3 -m venv venv
-fi
+cd $PROJECT_DIR
+sudo rm -rf venv
+python3 -m venv venv
+sudo chown -R $ACTUAL_USER:$ACTUAL_USER venv
 
 # Install required system packages
 print_status "Installing required packages..."
@@ -146,11 +153,34 @@ sudo ufw allow 'Nginx Full'
 sudo ufw allow OpenSSH
 sudo ufw --force enable
 
+# Install Python dependencies
+print_status "Installing Python dependencies..."
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+deactivate
+
+# Stop and remove any existing containers
+print_status "Cleaning up existing containers..."
+sudo docker-compose -f docker-compose.prod.yml down --remove-orphans
+
+# Pull Docker images first
+print_status "Pulling Docker images..."
+sudo docker-compose -f docker-compose.prod.yml pull
+
+# Build and start Docker containers
+print_status "Starting Docker containers..."
+sudo docker-compose -f docker-compose.prod.yml up -d --build
+
+# Wait for web container to be ready
+print_status "Waiting for web container to be ready..."
+sleep 10
+
 # Configure Nginx
 print_status "Configuring Nginx..."
 sudo tee /etc/nginx/conf.d/$DOMAIN.conf > /dev/null << 'EOL'
 upstream django {
-    server web:8000;
+    server localhost:8000;
 }
 
 map $http_upgrade $connection_upgrade {
@@ -233,14 +263,6 @@ server {
 }
 EOL
 
-# Install Python dependencies
-print_status "Installing Python dependencies..."
-sudo -u $ACTUAL_USER bash << EOF
-source venv/bin/activate
-pip install -r requirements.txt
-deactivate
-EOF
-
 # Obtain SSL certificate
 print_status "Obtaining SSL certificate..."
 sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email admin@lytestudios.be --redirect
@@ -255,14 +277,9 @@ sudo cp -r web/* /var/www/$DOMAIN/
 sudo cp .env /var/www/$DOMAIN/
 sudo chown -R $ACTUAL_USER:$ACTUAL_USER /var/www/$DOMAIN
 
-# Pull Docker images first
-print_status "Pulling Docker images..."
-sudo -u $ACTUAL_USER docker-compose -f docker-compose.prod.yml pull
-
-# Build and start Docker containers
-print_status "Starting Docker containers..."
-sudo -u $ACTUAL_USER docker-compose -f docker-compose.prod.yml up -d --build
-
 print_status "Setup completed successfully!"
 print_warning "Please ensure you have updated the .env file with your credentials"
 print_warning "Your site should be available at https://$DOMAIN"
+
+# Reload user groups to apply docker group changes
+print_warning "Please log out and back in for Docker permissions to take effect"
