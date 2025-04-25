@@ -1,16 +1,18 @@
-version: '3.8'
-
 services:
   test:
     build:
       context: .
       dockerfile: Dockerfile
-    command: pytest
+    volumes:
+      - .:/app
+    entrypoint: []
+    command: bash -c "chmod +x /app/docker-entrypoint.test.sh && /app/docker-entrypoint.test.sh"
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
       - DJANGO_SECRET_KEY=test_key
       - DJANGO_DEBUG=True
       - ALLOWED_HOSTS=localhost,127.0.0.1
+      - DOMAIN=gideon.lytestudios.be
       - POSTGRES_DB=gideon
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=0~cySne?(Ts4a~qD_)nLC:8?qKcZ
@@ -18,6 +20,7 @@ services:
       - POSTGRES_PORT=5432
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - PYTHONPATH=/app
     depends_on:
       - redis
 

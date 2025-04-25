@@ -42,4 +42,5 @@ class Message(models.Model):
         ordering = ['created_at']
 
     def __str__(self):
-        return f"{self.user.username}: {self.content[:50]}..."
+        truncated_content = self.content[:50] + "..." if len(self.content) > 50 else self.content
+        return f"{self.user.username}: {truncated_content}"

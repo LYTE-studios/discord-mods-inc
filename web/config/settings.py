@@ -146,8 +146,10 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    f"https://{os.environ.get('DOMAIN', '')}",
 ]
+
+if os.environ.get('DOMAIN'):
+    CORS_ALLOWED_ORIGINS.append(f"https://{os.environ.get('DOMAIN')}")
 
 # Session settings
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'

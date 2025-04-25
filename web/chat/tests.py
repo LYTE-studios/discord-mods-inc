@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -7,6 +7,16 @@ from .models import Conversation, Message
 
 User = get_user_model()
 
+@override_settings(
+    SECRET_KEY='django-insecure-test-key-123',
+    MIDDLEWARE=[
+        'django.contrib.sessions.middleware.SessionMiddleware',
+        'django.middleware.common.CommonMiddleware',
+        'django.middleware.csrf.CsrfViewMiddleware',
+        'django.contrib.auth.middleware.AuthenticationMiddleware',
+        'django.contrib.messages.middleware.MessageMiddleware',
+    ]
+)
 class ConversationTests(APITestCase):
     def setUp(self):
         """Set up test data"""
@@ -100,6 +110,7 @@ class ConversationTests(APITestCase):
         
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+@override_settings(SECRET_KEY='django-insecure-test-key-123')
 class ConversationModelTests(TestCase):
     def setUp(self):
         """Set up test data"""
@@ -131,7 +142,7 @@ class ConversationModelTests(TestCase):
         )
         self.assertEqual(
             str(message),
-            f"{self.user.username}: Test message content that is longer than fifty chara..."
+            f"{self.user.username}: Test message content that is longer than fifty cha..."
         )
 
     def test_conversation_ordering(self):

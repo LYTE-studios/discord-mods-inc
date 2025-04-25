@@ -2,7 +2,8 @@ FROM python:3.11-slim-bullseye
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
 # System dependencies
 RUN apt-get update \
@@ -22,16 +23,14 @@ RUN addgroup --system web \
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install pytest pytest-django pytest-cov pytest-asyncio
 
 # Copy project files
-COPY web/ .
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY . .
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/static /app/media \
-    && chown -R web:web /app/static /app/media \
     && chown -R web:web /app
 
 # Switch to non-root user
@@ -41,6 +40,8 @@ USER web
 EXPOSE 8000
 
 # Set the entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 ENTRYPOINT ["docker-entrypoint.sh"]
 
 # Default command
