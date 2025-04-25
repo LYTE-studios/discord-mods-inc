@@ -20,18 +20,19 @@ WORKDIR /app
 RUN addgroup --system web \
     && adduser --system --ingroup web web
 
-# Copy requirements first for better caching
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy Django project files
+# Copy project files
 COPY web/ .
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/static /app/media \
-    && chown -R web:web /app/static /app/media
+    && chown -R web:web /app/static /app/media \
+    && chown -R web:web /app
 
 # Switch to non-root user
 USER web

@@ -168,17 +168,8 @@ cp -r tickets web/tickets
 cp -r utils web/utils
 cp -r workflow web/workflow
 
-# Copy configuration files
-cp config.py web/config/settings.py
+# Copy requirements.txt
 cp requirements.txt web/
-
-# Create Django project files
-chmod +x web/manage.py
-
-# Create __init__.py files
-touch web/config/__init__.py
-touch web/chat/__init__.py
-touch web/users/__init__.py
 
 # Stop and remove any existing containers
 print_status "Cleaning up existing containers..."
