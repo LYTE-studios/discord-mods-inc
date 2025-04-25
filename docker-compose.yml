@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
+      - .:/app
       - static_volume:/app/static
       - media_volume:/app/media
     environment:
@@ -49,6 +50,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    volumes:
+      - .:/app
     command: celery -A config worker -l INFO
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
@@ -68,6 +71,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    volumes:
+      - .:/app
     command: celery -A config beat -l INFO
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
