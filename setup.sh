@@ -46,10 +46,11 @@ ALLOWED_HOSTS=gideon.lytestudios.be
 DOMAIN=gideon.lytestudios.be
 
 # Database settings
-SUPABASE_DB_NAME=postgres
-SUPABASE_DB_USER=postgres
-SUPABASE_DB_PASSWORD=super_secret_db_password_123
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNTE2MjM5MDIyfQ.vZ7BeGD5k7RAVbXkGh-SuH9tGjhLrCuKn1W3e_Zf8tc
+POSTGRES_DB=postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres_password_123
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
 
 # Redis settings
 REDIS_HOST=redis
@@ -59,10 +60,10 @@ REDIS_PORT=6379
 SSL_EMAIL=admin@lytestudios.be
 
 # Other settings
-OPENAI_API_KEY=${OPENAI_API_KEY:-your_openai_key}
-GITHUB_TOKEN=${GITHUB_TOKEN:-your_github_token}
+OPENAI_API_KEY=your_openai_key
+GITHUB_TOKEN=your_github_token
 JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
-ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key}
+ENCRYPTION_KEY=your_encryption_key
 EOL
 
 chmod 600 .env
@@ -110,7 +111,8 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential \
     libpq-dev
 
-# Install Docker if not present
+# Check Docker installation
+print_status "Checking Docker installation..."
 if ! command -v docker &> /dev/null; then
     print_status "Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
@@ -121,10 +123,14 @@ if ! command -v docker &> /dev/null; then
 else
     print_status "Docker is already installed"
     # Ensure user is in docker group
-    sudo usermod -aG docker "$USERNAME"
+    if ! groups "$USERNAME" | grep -q "\bdocker\b"; then
+        print_status "Adding user to docker group..."
+        sudo usermod -aG docker "$USERNAME"
+    fi
 fi
 
-# Install Docker Compose if not present
+# Check Docker Compose installation
+print_status "Checking Docker Compose installation..."
 if ! command -v docker-compose &> /dev/null; then
     print_status "Installing Docker Compose..."
     sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose

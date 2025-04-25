@@ -14,11 +14,6 @@ services:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
       - DJANGO_DEBUG=${DJANGO_DEBUG}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -27,7 +22,6 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     depends_on:
       - redis
-      - db
     networks:
       - web_network
       - internal_network
@@ -57,18 +51,6 @@ services:
     networks:
       - internal_network
 
-  db:
-    image: postgres:14-alpine
-    restart: always
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-    networks:
-      - internal_network
-
   certbot:
     image: certbot/certbot:v2.5.0
     restart: unless-stopped
@@ -91,18 +73,12 @@ services:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
       - DJANGO_DEBUG=${DJANGO_DEBUG}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
     depends_on:
       - redis
-      - db
     networks:
       - internal_network
 
@@ -117,16 +93,10 @@ services:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
       - DJANGO_DEBUG=${DJANGO_DEBUG}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
     depends_on:
       - redis
-      - db
     networks:
       - internal_network
 
@@ -134,7 +104,6 @@ volumes:
   static_volume:
   media_volume:
   redis_data:
-  postgres_data:
 
 networks:
   web_network:

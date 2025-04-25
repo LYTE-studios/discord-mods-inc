@@ -10,11 +10,12 @@ import sys
 import psycopg2
 try:
     psycopg2.connect(
-        dbname="${POSTGRES_DB}",
-        user="${POSTGRES_USER}",
-        password="${POSTGRES_PASSWORD}",
-        host="${POSTGRES_HOST}",
-        port="${POSTGRES_PORT}",
+        dbname="gideon",
+        user="postgres",
+        password="0~cySne?(Ts4a~qD_)nLC:8?qKcZ",
+        host="framer-api.cd4qc66im6mq.eu-central-1.rds.amazonaws.com",
+        port="5432",
+        options="-c target_session_attrs=read-write"
     )
 except psycopg2.OperationalError:
     sys.exit(-1)
@@ -39,10 +40,10 @@ END
 }
 
 until postgres_ready; do
-  >&2 echo "Waiting for PostgreSQL to become available..."
+  >&2 echo "Waiting for RDS PostgreSQL to become available..."
   sleep 1
 done
->&2 echo "PostgreSQL is available"
+>&2 echo "RDS PostgreSQL is available"
 
 until redis_ready; do
   >&2 echo "Waiting for Redis to become available..."
