@@ -23,6 +23,12 @@ print_error() {
     echo -e "${RED}[-] $1${NC}"
 }
 
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    print_error "Please run as root"
+    exit 1
+fi
+
 # Get the actual username
 ACTUAL_USER=$(who am i | awk '{print $1}')
 if [ -z "$ACTUAL_USER" ]; then
@@ -30,13 +36,19 @@ if [ -z "$ACTUAL_USER" ]; then
 fi
 print_status "Running setup for user: $ACTUAL_USER"
 
+# Create project directory if it doesn't exist
+if [ ! -d "$PROJECT_DIR" ]; then
+    mkdir -p "$PROJECT_DIR"
+    chown $ACTUAL_USER:$ACTUAL_USER "$PROJECT_DIR"
+fi
+
 # Stop existing nginx service
 print_status "Stopping existing nginx service..."
-sudo systemctl stop nginx
+systemctl stop nginx || true
 
 # Generate environment file
 print_status "Generating environment file..."
-cat << 'EOL' | sudo tee .env > /dev/null
+cat << 'EOL' | tee .env > /dev/null
 # Web Configuration
 DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
 DJANGO_DEBUG=False
@@ -64,14 +76,14 @@ ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key}
 EOL
 
 # Set proper permissions for .env
-sudo chown $ACTUAL_USER:$ACTUAL_USER .env
-sudo chmod 600 .env
+chown $ACTUAL_USER:$ACTUAL_USER .env
+chmod 600 .env
 
 # Function to install package if not present
 install_if_missing() {
     if ! command -v $1 &> /dev/null; then
         print_status "Installing $1..."
-        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $2 || {
+        DEBIAN_FRONTEND=noninteractive apt-get install -y $2 || {
             print_error "Failed to install $1"
             exit 1
         }
@@ -82,11 +94,11 @@ install_if_missing() {
 
 # Update package list
 print_status "Updating package list..."
-sudo rm -f /var/lib/apt/lists/lock
-sudo rm -f /var/cache/apt/archives/lock
-sudo rm -f /var/lib/dpkg/lock*
-sudo dpkg --configure -a
-sudo DEBIAN_FRONTEND=noninteractive apt-get update
+rm -f /var/lib/apt/lists/lock
+rm -f /var/cache/apt/archives/lock
+rm -f /var/lib/dpkg/lock*
+dpkg --configure -a
+DEBIAN_FRONTEND=noninteractive apt-get update
 
 # Install Python3 if not present
 install_if_missing python3 "python3-full"
@@ -95,14 +107,14 @@ install_if_missing python3-pip "python3-pip"
 
 # Create and activate virtual environment
 print_status "Setting up Python virtual environment..."
-cd $PROJECT_DIR
-sudo -u $ACTUAL_USER mkdir -p venv
-sudo -u $ACTUAL_USER python3 -m venv venv
-sudo chown -R $ACTUAL_USER:$ACTUAL_USER venv
+cd "$PROJECT_DIR"
+rm -rf venv
+runuser -l $ACTUAL_USER -c "cd $PROJECT_DIR && python3 -m venv venv"
+chown -R $ACTUAL_USER:$ACTUAL_USER venv
 
 # Install required system packages
 print_status "Installing required packages..."
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+DEBIAN_FRONTEND=noninteractive apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -119,61 +131,55 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 if ! command -v docker &> /dev/null; then
     print_status "Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-    sudo usermod -aG docker $ACTUAL_USER
-    sudo systemctl enable docker
-    sudo systemctl start docker
+    sh get-docker.sh
+    usermod -aG docker $ACTUAL_USER
+    systemctl enable docker
+    systemctl start docker
 else
     print_status "Docker is already installed"
     # Ensure user is in docker group
-    sudo usermod -aG docker $ACTUAL_USER
+    usermod -aG docker $ACTUAL_USER
 fi
 
 # Install Docker Compose if not present
 if ! command -v docker-compose &> /dev/null; then
     print_status "Installing Docker Compose..."
-    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
+    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
 else
     print_status "Docker Compose is already installed"
 fi
 
 # Create necessary directories
 print_status "Creating project directories..."
-sudo mkdir -p /var/www/$DOMAIN/{static,media,logs,ssl,nginx/conf.d}
+mkdir -p /var/www/$DOMAIN/{static,media,logs,ssl,nginx/conf.d}
 
 # Set proper permissions
 print_status "Setting permissions..."
-sudo chown -R $ACTUAL_USER:$ACTUAL_USER /var/www/$DOMAIN
-sudo chmod -R 755 /var/www/$DOMAIN
+chown -R $ACTUAL_USER:$ACTUAL_USER /var/www/$DOMAIN
+chmod -R 755 /var/www/$DOMAIN
 
 # Configure firewall
 print_status "Configuring firewall..."
-sudo ufw allow 'Nginx Full'
-sudo ufw allow OpenSSH
-sudo ufw --force enable
+ufw allow 'Nginx Full'
+ufw allow OpenSSH
+ufw --force enable
 
 # Install Python dependencies
 print_status "Installing Python dependencies..."
-sudo -u $ACTUAL_USER bash -c "
-    cd $PROJECT_DIR
-    . ./venv/bin/activate
-    pip install --upgrade pip
-    pip install -r requirements.txt
-    deactivate
-"
+runuser -l $ACTUAL_USER -c "cd $PROJECT_DIR && . ./venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt && deactivate"
 
 # Stop and remove any existing containers
 print_status "Cleaning up existing containers..."
-sudo docker-compose -f docker-compose.prod.yml down --remove-orphans
+runuser -l $ACTUAL_USER -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml down --remove-orphans"
 
 # Pull Docker images first
 print_status "Pulling Docker images..."
-sudo docker-compose -f docker-compose.prod.yml pull
+runuser -l $ACTUAL_USER -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml pull"
 
 # Build and start Docker containers
 print_status "Starting Docker containers..."
-sudo docker-compose -f docker-compose.prod.yml up -d --build
+runuser -l $ACTUAL_USER -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml up -d --build"
 
 # Wait for web container to be ready
 print_status "Waiting for web container to be ready..."
@@ -181,12 +187,12 @@ sleep 10
 
 # Configure initial Nginx for HTTP
 print_status "Configuring initial Nginx for HTTP..."
-sudo tee /etc/nginx/conf.d/rate_limiting.conf > /dev/null << 'EOL'
+tee /etc/nginx/conf.d/rate_limiting.conf > /dev/null << 'EOL'
 limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
 EOL
 
 # Configure HTTP-only first
-sudo tee /etc/nginx/conf.d/$DOMAIN.conf > /dev/null << EOL
+tee /etc/nginx/conf.d/$DOMAIN.conf > /dev/null << EOL
 upstream django {
     server localhost:8000;
 }
@@ -238,26 +244,16 @@ server {
 }
 EOL
 
-# Test and reload Nginx
-sudo nginx -t && sudo systemctl reload nginx
-
-# Obtain SSL certificate
-print_status "Obtaining SSL certificate..."
-sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email admin@lytestudios.be --redirect
-
-# Setup auto-renewal for SSL
-print_status "Setting up SSL auto-renewal..."
-(sudo crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet") | sudo crontab -
-
-# Copy project files
-print_status "Copying project files..."
-sudo cp -r web/* /var/www/$DOMAIN/
-sudo cp .env /var/www/$DOMAIN/
-sudo chown -R $ACTUAL_USER:$ACTUAL_USER /var/www/$DOMAIN
+# Start and test Nginx
+print_status "Starting and testing Nginx..."
+systemctl start nginx
+nginx -t && systemctl reload nginx
 
 print_status "Setup completed successfully!"
-print_warning "Please ensure you have updated the .env file with your credentials"
-print_warning "Your site should be available at https://$DOMAIN"
-
-# Reload user groups to apply docker group changes
+print_warning "Please ensure you have:"
+print_warning "1. Updated the .env file with your credentials"
+print_warning "2. Set up DNS records for $DOMAIN pointing to this server"
+print_warning "3. Once DNS is propagated, run: certbot --nginx -d $DOMAIN"
+print_warning "Your site is available at http://$DOMAIN"
+print_warning "After DNS propagation, run certbot to enable HTTPS"
 print_warning "Please log out and back in for Docker permissions to take effect"
