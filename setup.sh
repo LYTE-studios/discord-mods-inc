@@ -23,7 +23,6 @@ print_error() {
     echo -e "${RED}[-] $1${NC}"
 }
 
-    exit 1
 # Get username
 USERNAME=$(whoami)
 print_status "Running setup for user: $USERNAME"
