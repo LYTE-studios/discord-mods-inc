@@ -96,7 +96,7 @@ install_if_missing python3-pip "python3-pip"
 # Create and activate virtual environment
 print_status "Setting up Python virtual environment..."
 cd $PROJECT_DIR
-sudo rm -rf venv
+sudo -u $ACTUAL_USER mkdir -p venv
 sudo -u $ACTUAL_USER python3 -m venv venv
 sudo chown -R $ACTUAL_USER:$ACTUAL_USER venv
 
@@ -156,6 +156,7 @@ sudo ufw --force enable
 # Install Python dependencies
 print_status "Installing Python dependencies..."
 sudo -u $ACTUAL_USER bash -c "
+    cd $PROJECT_DIR
     . ./venv/bin/activate
     pip install --upgrade pip
     pip install -r requirements.txt
@@ -178,82 +179,50 @@ sudo docker-compose -f docker-compose.prod.yml up -d --build
 print_status "Waiting for web container to be ready..."
 sleep 10
 
-# Configure Nginx
-print_status "Configuring Nginx..."
-
-# First, add rate limiting to http context
+# Configure initial Nginx for HTTP
+print_status "Configuring initial Nginx for HTTP..."
 sudo tee /etc/nginx/conf.d/rate_limiting.conf > /dev/null << 'EOL'
 limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
 EOL
 
-# Then configure the server
-sudo tee /etc/nginx/conf.d/$DOMAIN.conf > /dev/null << 'EOL'
+# Configure HTTP-only first
+sudo tee /etc/nginx/conf.d/$DOMAIN.conf > /dev/null << EOL
 upstream django {
     server localhost:8000;
 }
 
-map $http_upgrade $connection_upgrade {
+map \$http_upgrade \$connection_upgrade {
     default upgrade;
     '' close;
 }
 
 server {
     listen 80;
-    server_name gideon.lytestudios.be;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name gideon.lytestudios.be;
-
-    ssl_certificate /etc/letsencrypt/live/gideon.lytestudios.be/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/gideon.lytestudios.be/privkey.pem;
-    ssl_session_timeout 1d;
-    ssl_session_cache shared:SSL:50m;
-    ssl_session_tickets off;
-
-    # Modern configuration
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-
-    # OCSP Stapling
-    ssl_stapling on;
-    ssl_stapling_verify on;
-    resolver 8.8.8.8 8.8.4.4 valid=300s;
-    resolver_timeout 5s;
-
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    server_name $DOMAIN;
 
     # Logs
-    access_log /var/www/gideon.lytestudios.be/logs/nginx-access.log;
-    error_log /var/www/gideon.lytestudios.be/logs/nginx-error.log;
+    access_log /var/www/$DOMAIN/logs/nginx-access.log;
+    error_log /var/www/$DOMAIN/logs/nginx-error.log;
 
     # Proxy settings
     location / {
         limit_req zone=one burst=10 nodelay;
         proxy_pass http://django;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
 
         # WebSocket support
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
         proxy_read_timeout 86400;
     }
 
     # Static files
     location /static/ {
-        alias /var/www/gideon.lytestudios.be/static/;
+        alias /var/www/$DOMAIN/static/;
         expires 1y;
         access_log off;
         add_header Cache-Control "public";
@@ -261,7 +230,7 @@ server {
 
     # Media files
     location /media/ {
-        alias /var/www/gideon.lytestudios.be/media/;
+        alias /var/www/$DOMAIN/media/;
         expires 1y;
         access_log off;
         add_header Cache-Control "public";
@@ -269,8 +238,8 @@ server {
 }
 EOL
 
-# Test Nginx configuration
-sudo nginx -t
+# Test and reload Nginx
+sudo nginx -t && sudo systemctl reload nginx
 
 # Obtain SSL certificate
 print_status "Obtaining SSL certificate..."
