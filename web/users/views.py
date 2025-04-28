@@ -1,10 +1,34 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, login, authenticate
+from django.shortcuts import render, redirect
+from django.views import View
 from .serializers import UserSerializer
 
 User = get_user_model()
+
+class LoginView(View):
+    def get(self, request):
+        if request.user.is_authenticated:
+            return redirect('chat:list')
+        return render(request, 'users/login.html')
+
+    def post(self, request):
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        
+        user = authenticate(request, username=email, password=password)
+        
+        if user is not None:
+            if not User.objects.filter(is_superuser=True).exists() or user.is_superuser:
+                login(request, user)
+                return redirect('chat:list')
+            else:
+                return render(request, 'users/login.html', {'error': 'Only superusers are allowed to login'})
+        else:
+            return render(request, 'users/login.html', {'error': 'Invalid credentials'})
+
 
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
