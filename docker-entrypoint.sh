@@ -28,9 +28,6 @@ until redis_ready; do
 done
 >&2 echo "Redis is available"
 
-# Ensure proper permissions
-chmod -R 755 /app/static /app/media
-
 # Apply database migrations
 python manage.py migrate --noinput
 

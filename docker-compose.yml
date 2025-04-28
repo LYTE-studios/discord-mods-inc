@@ -10,7 +10,7 @@ services:
     env_file:
       - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings
+      - DJANGO_SETTINGS_MODULE=web.config.settings
     depends_on:
       - redis
     networks:
@@ -49,11 +49,11 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/app:delegated
-    command: celery -A config worker -l INFO
+    command: celery -A web.config worker -l INFO
     env_file:
       - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings
+      - DJANGO_SETTINGS_MODULE=web.config.settings
     depends_on:
       - redis
     networks:
@@ -66,11 +66,11 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/app:delegated
-    command: celery -A config beat -l INFO
+    command: celery -A web.config beat -l INFO
     env_file:
       - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings
+      - DJANGO_SETTINGS_MODULE=web.config.settings
     depends_on:
       - redis
     networks:

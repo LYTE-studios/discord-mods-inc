@@ -30,16 +30,19 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install pytest pytest-django pytest-cov pytest-asyncio
 
-# Create necessary directories and set permissions
+# Create necessary directories
 RUN mkdir -p /app/static /app/media \
-    && chown -R web:web /app \
-    && chmod 755 /app
+    && chown -R web:web /app
 
 # Copy Django project files
-COPY web/ /app/
-COPY manage.py config.py /app/
+COPY web/ /app/web/
+COPY manage.py /app/
+COPY config.py /app/
 
-# Set proper ownership for all files
+# Ensure web directory is a Python package
+RUN touch /app/web/__init__.py
+
+# Set proper ownership
 RUN chown -R web:web /app
 
 # Switch to non-root user
@@ -52,4 +55,4 @@ EXPOSE 8000
 ENTRYPOINT ["docker-entrypoint.sh"]
 
 # Default command
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120", "config.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120", "web.config.wsgi:application"]
