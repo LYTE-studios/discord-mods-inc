@@ -5,6 +5,9 @@ from . import views
 router = DefaultRouter()
 router.register(r'conversations', views.ConversationViewSet, basename='conversation')
 
+app_name = 'chat'
+
 urlpatterns = [
-    path('', include(router.urls)),
+    path('', views.ChatListView.as_view(), name='list'),
+    path('api/', include(router.urls)),
 ]
