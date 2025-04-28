@@ -33,7 +33,7 @@ python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 
 # Create cache table
-python manage.py createcachetable --noinput
+python manage.py createcachetable
 
 # Start server
 exec "$@"
