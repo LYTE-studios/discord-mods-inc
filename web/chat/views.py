@@ -2,8 +2,16 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from django.views.generic import TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
+
+class ChatListView(LoginRequiredMixin, TemplateView):
+    """
+    View for displaying the chat list page.
+    """
+    template_name = 'chat/list.html'
 
 class ConversationViewSet(viewsets.ModelViewSet):
     """
