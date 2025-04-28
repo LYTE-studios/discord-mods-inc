@@ -11,6 +11,7 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=web.config.settings
+      - PYTHONPATH=/app
     depends_on:
       - redis
     networks:
@@ -54,6 +55,7 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=web.config.settings
+      - PYTHONPATH=/app
     depends_on:
       - redis
     networks:
@@ -71,6 +73,7 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=web.config.settings
+      - PYTHONPATH=/app
     depends_on:
       - redis
     networks:

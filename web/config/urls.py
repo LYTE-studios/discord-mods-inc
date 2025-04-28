@@ -8,9 +8,9 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/chat/', include('chat.urls')),
-    path('api/users/', include('users.urls')),
-    path('', include('chat.urls')),  # Chat interface as main page
+    path('api/chat/', include('web.chat.urls')),
+    path('api/users/', include('web.users.urls')),
+    path('', include('web.chat.urls')),  # Chat interface as main page
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 # Add media files serving in development

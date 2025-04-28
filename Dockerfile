@@ -34,15 +34,10 @@ RUN pip install --no-cache-dir -r requirements.txt \
 RUN mkdir -p /app/static /app/media \
     && chown -R web:web /app
 
-# Copy Django project files
-COPY web/ /app/web/
-COPY manage.py /app/
-COPY config.py /app/
+# Copy project files
+COPY . /app/
 
-# Ensure web directory is a Python package
-RUN touch /app/web/__init__.py
-
-# Set proper ownership
+# Ensure proper ownership
 RUN chown -R web:web /app
 
 # Switch to non-root user
