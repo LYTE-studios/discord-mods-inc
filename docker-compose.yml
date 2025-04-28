@@ -7,18 +7,10 @@ services:
       - .:/app:delegated
       - static_volume:/app/static
       - media_volume:/app/media
-      - ./.env:/app/.env:ro
+    env_file:
+      - .env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-      - DJANGO_DEBUG=${DJANGO_DEBUG}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     depends_on:
       - redis
     networks:
@@ -57,17 +49,11 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/app:delegated
-      - ./.env:/app/.env:ro
     command: celery -A config worker -l INFO
+    env_file:
+      - .env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-      - DJANGO_DEBUG=${DJANGO_DEBUG}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
     depends_on:
       - redis
     networks:
@@ -80,15 +66,11 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/app:delegated
-      - ./.env:/app/.env:ro
     command: celery -A config beat -l INFO
+    env_file:
+      - .env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-      - DJANGO_DEBUG=${DJANGO_DEBUG}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
     depends_on:
       - redis
     networks:
