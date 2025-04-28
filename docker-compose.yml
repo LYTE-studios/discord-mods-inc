@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/app:delegated
-      - static_volume:/app/static
-      - media_volume:/app/media
+      - static_volume:/app/web/staticfiles
+      - media_volume:/app/web/media
     env_file:
       - .env
     environment:
@@ -23,8 +23,8 @@ services:
       context: ./nginx
       dockerfile: Dockerfile
     volumes:
-      - static_volume:/app/static
-      - media_volume:/app/media
+      - static_volume:/app/web/staticfiles
+      - media_volume:/app/web/media
       - /var/log/nginx:/var/log/nginx
     ports:
       - "80:80"
@@ -49,6 +49,8 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/app:delegated
+      - static_volume:/app/web/staticfiles
+      - media_volume:/app/web/media
     command: celery -A web.config worker -l INFO
     env_file:
       - .env
@@ -67,6 +69,8 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/app:delegated
+      - static_volume:/app/web/staticfiles
+      - media_volume:/app/web/media
     command: celery -A web.config beat -l INFO
     env_file:
       - .env
