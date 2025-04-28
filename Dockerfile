@@ -30,16 +30,23 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install pytest pytest-django pytest-cov pytest-asyncio
 
-# Create necessary directories
+# Create necessary directories and set permissions
 RUN mkdir -p /app/static /app/media \
-    && chown -R web:web /app
+    && chown -R web:web /app \
+    && chmod 755 /app
 
 # Copy Django project files
 COPY web/ /app/
-COPY manage.py /app/
+COPY manage.py config.py /app/
 
-# Set proper ownership
-RUN chown -R web:web /app
+# Create .env directory with proper permissions
+RUN mkdir -p /app/.env.d \
+    && chown web:web /app/.env.d \
+    && chmod 700 /app/.env.d
+
+# Set proper ownership for all files
+RUN chown -R web:web /app \
+    && chmod -R 644 /app/config.py
 
 # Switch to non-root user
 USER web

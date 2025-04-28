@@ -4,9 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - .:/app
+      - .:/app:delegated
       - static_volume:/app/static
       - media_volume:/app/media
+      - ./.env:/app/.env:ro
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
@@ -23,6 +24,7 @@ services:
     networks:
       - web_network
       - internal_network
+    restart: unless-stopped
 
   nginx:
     build:
@@ -39,6 +41,7 @@ services:
       - web
     networks:
       - web_network
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -46,13 +49,15 @@ services:
       - redis_data:/data
     networks:
       - internal_network
+    restart: unless-stopped
 
   celery:
     build:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - .:/app
+      - .:/app:delegated
+      - ./.env:/app/.env:ro
     command: celery -A config worker -l INFO
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
@@ -67,13 +72,15 @@ services:
       - redis
     networks:
       - internal_network
+    restart: unless-stopped
 
   celery-beat:
     build:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - .:/app
+      - .:/app:delegated
+      - ./.env:/app/.env:ro
     command: celery -A config beat -l INFO
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
@@ -86,6 +93,7 @@ services:
       - redis
     networks:
       - internal_network
+    restart: unless-stopped
 
 volumes:
   static_volume:
