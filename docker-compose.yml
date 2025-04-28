@@ -25,12 +25,13 @@ services:
       - internal_network
 
   nginx:
-    image: nginx:1.23-alpine
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
     volumes:
       - static_volume:/app/static
       - media_volume:/app/media
-      - ./nginx:/etc/nginx/conf.d
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/log/nginx:/var/log/nginx
     ports:
       - "80:80"
       - "443:443"

@@ -35,6 +35,7 @@ fi
 # Stop existing nginx service
 print_status "Stopping existing nginx service..."
 sudo systemctl stop nginx || true
+sudo systemctl disable nginx || true
 
 # Generate environment file
 print_status "Generating environment file..."
@@ -103,7 +104,6 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates \
     curl \
     software-properties-common \
-    nginx \
     certbot \
     python3-certbot-nginx \
     ufw \
@@ -141,7 +141,7 @@ fi
 
 # Create necessary directories
 print_status "Creating project directories..."
-sudo mkdir -p "/var/www/$DOMAIN"/{static,media,logs,ssl,nginx/conf.d}
+sudo mkdir -p "/var/www/$DOMAIN"/{static,media,logs}
 sudo chown -R "$USERNAME:$USERNAME" "/var/www/$DOMAIN"
 
 # Configure firewall
@@ -166,8 +166,6 @@ mkdir -p web/static/{css,js}
 # Copy existing modules to Django project
 cp -r ai web/ai
 cp -r cogs web/cogs
-cp -r database web/database
-cp -r github web/github
 cp -r monitoring web/monitoring
 cp -r security web/security
 cp -r tickets web/tickets
@@ -179,83 +177,15 @@ cp requirements.txt web/
 
 # Stop and remove any existing containers
 print_status "Cleaning up existing containers..."
-docker-compose -f docker-compose.prod.yml down --remove-orphans
-
-# Pull Docker images first
-print_status "Pulling Docker images..."
-docker-compose -f docker-compose.prod.yml pull
+docker compose down --remove-orphans
 
 # Build and start Docker containers
 print_status "Starting Docker containers..."
-docker-compose -f docker-compose.prod.yml up -d --build
+docker compose up -d --build
 
 # Wait for web container to be ready
 print_status "Waiting for web container to be ready..."
 sleep 10
-
-# Configure initial Nginx for HTTP
-print_status "Configuring initial Nginx for HTTP..."
-sudo tee /etc/nginx/conf.d/rate_limiting.conf > /dev/null << 'EOL'
-limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
-EOL
-
-# Configure HTTP-only first
-sudo tee "/etc/nginx/conf.d/$DOMAIN.conf" > /dev/null << EOL
-upstream django {
-    server localhost:8000;
-}
-
-map \$http_upgrade \$connection_upgrade {
-    default upgrade;
-    '' close;
-}
-
-server {
-    listen 80;
-    server_name $DOMAIN;
-
-    # Logs
-    access_log /var/www/$DOMAIN/logs/nginx-access.log;
-    error_log /var/www/$DOMAIN/logs/nginx-error.log;
-
-    # Proxy settings
-    location / {
-        limit_req zone=one burst=10 nodelay;
-        proxy_pass http://django;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-
-        # WebSocket support
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \$connection_upgrade;
-        proxy_read_timeout 86400;
-    }
-
-    # Static files
-    location /static/ {
-        alias /var/www/$DOMAIN/static/;
-        expires 1y;
-        access_log off;
-        add_header Cache-Control "public";
-    }
-
-    # Media files
-    location /media/ {
-        alias /var/www/$DOMAIN/media/;
-        expires 1y;
-        access_log off;
-        add_header Cache-Control "public";
-    }
-}
-EOL
-
-# Start and test Nginx
-print_status "Starting and testing Nginx..."
-sudo systemctl start nginx
-sudo nginx -t && sudo systemctl reload nginx
 
 # Copy project files
 print_status "Copying project files..."
