@@ -31,16 +31,16 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && pip install pytest pytest-django pytest-cov pytest-asyncio
 
 # Create necessary directories with proper permissions
-RUN mkdir -p /app/web/staticfiles /app/web/media \
+RUN mkdir -p /app/static /app/web/media \
     && chown -R web:web /app \
-    && chmod -R 777 /app/web/staticfiles /app/web/media
+    && chmod -R 777 /app/static /app/web/media
 
 # Copy project files
 COPY . /app/
 
 # Ensure proper ownership
 RUN chown -R web:web /app \
-    && chmod -R 777 /app/web/staticfiles /app/web/media
+    && chmod -R 777 /app/static /app/web/media
 
 # Switch to non-root user
 USER web
