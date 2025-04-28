@@ -1,9 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional, Dict
-from dotenv import load_dotenv
 import os
-
-load_dotenv()
 
 class Settings(BaseSettings):
     # Discord Configuration
@@ -76,9 +73,7 @@ class Settings(BaseSettings):
     ]
 
     model_config = {
-        "case_sensitive": True,
-        "env_file": ".env",
-        "env_file_encoding": "utf-8"
+        "case_sensitive": True
     }
 
 settings = Settings()
