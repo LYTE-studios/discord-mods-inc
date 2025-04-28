@@ -1,95 +1,86 @@
-# AI Development Team Platform
+# Discord Mods Inc
 
-A revolutionary platform that creates AI-powered development teams through a web interface. Each team member (CTO, UX Designer, UI Designer, Developers, and Testers) is an AI agent that collaborates to develop software based on user requests.
+A Django-based platform for AI-powered Discord moderation and management.
 
-## 🌟 Features
+## Project Structure
 
-- **AI Team Members**: Each agent has a specialized role and personality
-- **GitHub Integration**: Automatic repository management and code handling
-- **Ticket System**: Organized task management and tracking
-- **Real-time Collaboration**: AI agents communicate and work together
-- **Monitoring System**: Track system health and performance
-- **Security**: JWT-based authentication and role-based access control
-- **Web Interface**: Modern Django-based interface for interacting with AI team
-
-## 🛠 Technology Stack
-
-- **Backend**: Python 3.11+
-- **Web Framework**: Django 4.2+
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: JWT + Supabase Auth
-- **Monitoring**: Custom monitoring system with metrics collection
-- **Testing**: pytest with asyncio support
-- **CI/CD**: GitHub Actions
-- **Containerization**: Docker
-
-## 📋 Prerequisites
-
-- Docker and Docker Compose
-- Supabase Account and Credentials
-- GitHub Token (for repository management)
-- OpenAI API Key
-
-## 🚀 Quick Start
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/discord-mods-inc.git
-cd discord-mods-inc
+```
+web/
+├── chat/               # Chat application
+├── config/             # Django project settings
+├── core/              # Core functionality
+│   ├── services/      # Backend services
+│   │   ├── ai_service.py
+│   │   ├── monitoring_service.py
+│   │   ├── security_service.py
+│   │   ├── ticket_service.py
+│   │   ├── workflow_service.py
+│   │   └── service_registry.py
+│   └── models.py      # Core models
+├── static/            # Static files
+├── templates/         # HTML templates
+└── users/             # User management app
 ```
 
-2. Create a `.env` file:
-```env
-DJANGO_SECRET_KEY=your_django_secret_key
-DJANGO_DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
-OPENAI_API_KEY=your_openai_key
-GITHUB_TOKEN=your_github_token
-JWT_SECRET_KEY=your_jwt_secret
-ENCRYPTION_KEY=your_encryption_key
-LOG_LEVEL=INFO
+## Core Services
+
+The platform provides several core services:
+
+### AI Service
+Handles AI-powered interactions and responses using OpenAI's GPT models.
+
+```python
+from web.core.services import ai_service
+
+response = await ai_service.generate_response("Your prompt here")
 ```
 
-3. Start the application using Docker Compose:
-```bash
-docker-compose up -d
+### Monitoring Service
+Provides system monitoring and alerting functionality.
+
+```python
+from web.core.services import monitoring_service
+
+metrics = monitoring_service.get_system_metrics()
+alerts = monitoring_service.check_alerts()
 ```
 
-4. Access the web interface at http://localhost:8000
+### Security Service
+Manages authentication, authorization, and security features.
 
-## 🐳 Docker Setup
+```python
+from web.core.services import security_service
 
-The application is containerized using Docker for easy deployment and scaling. The setup includes:
-
-- Django application container
-- Supabase container (for local development)
-- Redis container (for caching and rate limiting)
-
-### Building the Image
-
-```bash
-docker build -t ai-team-platform .
+token = security_service.generate_token(user_id)
+user = security_service.get_user_from_token(token)
 ```
 
-### Running with Docker Compose
+### Ticket Service
+Handles support ticket management.
 
-```bash
-docker-compose up -d
+```python
+from web.core.services import ticket_service
+
+ticket = ticket_service.create_ticket(data, user)
+stats = ticket_service.get_ticket_stats()
 ```
 
-### Environment Variables
+### Workflow Service
+Manages workflow processes and tasks.
 
-All configuration is done through environment variables. See `.env.example` for all required variables.
+```python
+from web.core.services import workflow_service
 
-## 🔧 Development Setup
+workflow = workflow_service.create_workflow(data, user)
+stats = workflow_service.get_workflow_stats()
+```
 
-1. Create a virtual environment:
+## Setup
+
+1. Create and activate a virtual environment:
 ```bash
 python -m venv venv
-source venv/bin/activate  # Linux/macOS
-venv\Scripts\activate     # Windows
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 2. Install dependencies:
@@ -97,107 +88,46 @@ venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
 
-3. Install development dependencies:
+3. Set up environment variables:
 ```bash
-pip install -r requirements-dev.txt
+cp .env.example .env
+# Edit .env with your configuration
 ```
 
-4. Run Django development server:
+4. Run migrations:
 ```bash
 python manage.py migrate
+```
+
+5. Start the development server:
+```bash
 python manage.py runserver
 ```
 
-5. Run tests:
-```bash
-pytest -v
-```
+## Docker Deployment
 
-## 📚 Project Structure
-
-```
-ai-team-platform/
-├── ai/                     # AI team member implementations
-├── web/                    # Django web application
-│   ├── templates/         # HTML templates
-│   ├── static/           # Static files (CSS, JS)
-│   └── views/            # View controllers
-├── database/              # Database client and models
-├── github/                # GitHub integration
-├── monitoring/            # System monitoring
-├── security/              # Authentication and authorization
-├── tickets/               # Ticket management system
-├── utils/                 # Utility functions
-├── tests/                 # Test suite
-├── Dockerfile            # Docker configuration
-├── docker-compose.yml    # Docker Compose configuration
-├── requirements.txt      # Production dependencies
-└── requirements-dev.txt  # Development dependencies
-```
-
-## 🤖 AI Team Members
-
-- **CTO Bot**: Strategic planning and architecture decisions
-- **UX Designer Bot**: User experience design and flow
-- **UI Designer Bot**: Visual design and component creation
-- **Developer Bots**: Code implementation and review
-- **Tester Bot**: Testing and quality assurance
-
-## 🎫 Ticket System
-
-The system uses a ticket-based workflow:
-
-1. User creates a ticket with requirements
-2. CTO Bot analyzes and creates subtasks
-3. Team members claim and work on subtasks
-4. Tester Bot verifies the implementation
-5. CTO Bot reviews and merges the changes
-
-## 📊 Monitoring
-
-The system includes comprehensive monitoring:
-
-- System metrics (CPU, memory, disk usage)
-- API and request latency tracking
-- Error rate monitoring
-- Alert system for issues
-- Performance tracking
-
-## 🔐 Security
-
-- JWT-based authentication
-- Role-based access control
-- Request rate limiting
-- Encrypted sensitive data
-- Secure webhook handling
-
-## 🧪 Testing
-
-Run the test suite:
+The project includes Docker configuration for easy deployment:
 
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov
-
-# Run specific test file
-pytest tests/test_monitoring.py
+docker compose up -d
 ```
 
-## 📝 Contributing
+This will start all necessary services:
+- Django web server
+- Redis for channels
+- Celery workers
+- Nginx for static files and reverse proxy
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests
-5. Submit a pull request
+## Environment Variables
 
-## 📄 License
+Key environment variables:
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+- `DJANGO_SECRET_KEY`: Django secret key
+- `DJANGO_DEBUG`: Debug mode (True/False)
+- `ALLOWED_HOSTS`: Comma-separated list of allowed hosts
+- `OPENAI_API_KEY`: OpenAI API key for AI functionality
+- `REDIS_HOST`: Redis host for channels
+- `REDIS_PORT`: Redis port
+- `JWT_SECRET_KEY`: Secret key for JWT tokens
 
-## 🤝 Support
-
-For support, please open an issue in the GitHub repository.
+See `.env.example` for a complete list of configuration options.

@@ -1,12 +1,12 @@
 from django.apps import AppConfig
 
-class ChatConfig(AppConfig):
+class CoreConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'web.chat'
-    verbose_name = 'Chat System'
+    name = 'web.core'
+    verbose_name = 'Core System'
 
     def ready(self):
         """
-        Initialize any chat app specific signals or configurations
+        Initialize any core app specific signals or configurations
         """
         pass  # Add any initialization code here if needed
