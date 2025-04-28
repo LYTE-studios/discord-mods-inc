@@ -30,9 +30,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install pytest pytest-django pytest-cov pytest-asyncio
 
-# Create necessary directories
-RUN mkdir -p /app/static /app/media \
-    && chown -R web:web /app
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/static /app/media /app/web/staticfiles \
+    && chown -R web:web /app \
+    && chmod -R 755 /app/static /app/media /app/web/staticfiles
 
 # Copy project files
 COPY . /app/
