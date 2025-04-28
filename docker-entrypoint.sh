@@ -28,14 +28,28 @@ until redis_ready; do
 done
 >&2 echo "Redis is available"
 
-# Apply database migrations
-python manage.py migrate --noinput
+# Ensure static directory exists with proper permissions
+if [ ! -d "/app/static" ]; then
+    # These commands run as root since the script is owned by root
+    mkdir -p /app/static
+    chown -R web:web /app/static
+    chmod -R 777 /app/static
+fi
 
-# Collect static files
-python manage.py collectstatic --noinput
+# Switch to web user for Django commands
+exec su web -c "
+    # Apply database migrations
+    python manage.py migrate --noinput
 
-# Create cache table
-python manage.py createcachetable
+    # Collect static files
+    python manage.py collectstatic --noinput
+
+    # Create cache table
+    python manage.py createcachetable
+
+    # Execute the main command
+    exec $*
+"
 
 # Start server
 exec "$@"
