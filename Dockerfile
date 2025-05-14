@@ -32,15 +32,16 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && pip install pytest pytest-django pytest-cov pytest-asyncio
 
 # Create necessary directories
-RUN mkdir -p /app/static /app/web/media
+RUN mkdir -p /app/web/staticfiles /app/web/media /app/web/static
 
 # Copy project files
 COPY . /app/
 
 # Set permissions
 RUN chown -R web:web /app \
-    && chmod -R 777 /app \
-    && chmod g+s /app/static /app/web/media
+    && chmod -R 755 /app \
+    && chmod -R 777 /app/web/staticfiles /app/web/media /app/web/static \
+    && chmod g+s /app/web/staticfiles /app/web/media /app/web/static
 
 # Make entrypoint script run as root for directory creation
 RUN chown root:root /usr/local/bin/docker-entrypoint.sh \

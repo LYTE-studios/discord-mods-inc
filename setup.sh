@@ -140,9 +140,14 @@ if [ ! -d "web/core" ]; then
 fi
 
 # Create other required directories
-mkdir -p web/{config,chat,users,templates,static}
+mkdir -p web/{config,chat,users,templates,static,staticfiles,media}
 mkdir -p web/templates/{chat,users}
 mkdir -p web/static/{css,js}
+
+# Set proper permissions for static and media directories
+print_status "Setting up static and media directories..."
+sudo chown -R "$USERNAME:$USERNAME" web/static web/staticfiles web/media
+sudo chmod -R 777 web/static web/staticfiles web/media
 
 # Core modules check already done above
 
@@ -155,6 +160,16 @@ check_requirements
 # Stop and remove any existing containers
 print_status "Cleaning up existing containers..."
 docker compose down --remove-orphans
+
+# Create Docker volumes with proper permissions
+print_status "Creating Docker volumes..."
+docker volume rm discord-mods-inc_static_volume discord-mods-inc_media_volume || true
+docker volume create discord-mods-inc_static_volume
+docker volume create discord-mods-inc_media_volume
+
+# Ensure Docker user has correct permissions
+print_status "Setting up Docker user permissions..."
+docker run --rm -v "$(pwd):/app" python:3.11-slim-bullseye chown -R 999:999 /app/web/static /app/web/staticfiles /app/web/media
 
 # Build and start Docker containers
 print_status "Starting Docker containers..."

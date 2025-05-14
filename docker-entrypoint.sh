@@ -28,10 +28,10 @@ until redis_ready; do
 done
 >&2 echo "Redis is available"
 
-# Create and set permissions for static directory
-mkdir -p /app/static
-chown -R web:web /app/static
-chmod -R 777 /app/static
+# Create and set permissions for static directories
+mkdir -p /app/web/staticfiles /app/web/media /app/web/static
+chown -R web:web /app/web/staticfiles /app/web/media /app/web/static
+chmod -R 777 /app/web/staticfiles /app/web/media /app/web/static
 
 # Run Django commands as web user
 gosu web python manage.py migrate --noinput
@@ -41,5 +41,4 @@ gosu web python manage.py createcachetable
 # Execute the main command as web user
 exec gosu web "$@"
 
-# Start server
-exec "$@"
+# Note: Don't need the final exec "$@" as it's already handled by the previous exec
