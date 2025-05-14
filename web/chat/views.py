@@ -38,8 +38,13 @@ class ChatListView(LoginRequiredMixin, View):
         chat_type = request.GET.get('type', 'cto')
         message_content = request.POST.get('message')
 
+        # Check if this is an AJAX request
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
         if not message_content:
-            return JsonResponse({'status': 'error', 'message': 'No message content provided'}, status=400)
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': 'No message content provided'}, status=400)
+            return redirect('chat:list')
 
         try:
             # Generate AI response
@@ -49,22 +54,28 @@ class ChatListView(LoginRequiredMixin, View):
                 chat_type
             )
 
-            # Return just the AI response
-            return JsonResponse({
-                'status': 'success',
-                'message': {
-                    'content': ai_response,
-                    'is_ai': True,
-                    'created_at': datetime.now().strftime('%H:%M')
-                }
-            })
+            if is_ajax:
+                # Return JSON response for AJAX requests
+                return JsonResponse({
+                    'status': 'success',
+                    'message': {
+                        'content': ai_response,
+                        'is_ai': True,
+                        'created_at': datetime.now().strftime('%H:%M')
+                    }
+                })
+            else:
+                # Redirect for regular form submissions
+                return redirect('chat:list')
 
         except Exception as e:
             logger.error(f"Error in chat post: {str(e)}")
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Failed to process message. Please try again.'
-            }, status=500)
+            if is_ajax:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Failed to process message. Please try again.'
+                }, status=500)
+            return redirect('chat:list')
 
 
 class ChatRoomView(LoginRequiredMixin, TemplateView):

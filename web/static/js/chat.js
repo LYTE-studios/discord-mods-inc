@@ -29,8 +29,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle form submission
     messageForm.addEventListener('submit', function(e) {
-        e.preventDefault();
+        e.preventDefault(); // Prevent form from submitting normally
         handleSubmit();
+        return false; // Extra prevention of form submission
     });
 
     async function handleSubmit() {
@@ -52,17 +53,18 @@ document.addEventListener('DOMContentLoaded', function() {
         messageInput.style.height = 'auto';
 
         try {
-            // Get current URL with query parameters
-            const url = window.location.href;
+            // Create form data
+            const formData = new FormData();
+            formData.append('message', messageContent);
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
 
-            // Send message to server
-            const response = await fetch(url, {
+            // Send message to server using fetch
+            const response = await fetch(window.location.href, {
                 method: 'POST',
+                body: formData,
                 headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `message=${encodeURIComponent(messageContent)}`
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
             });
 
             if (!response.ok) throw new Error('Network response was not ok');
@@ -78,13 +80,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 messagesContainer.appendChild(aiMessageElement);
                 scrollToBottom();
             } else {
-                throw new Error('Invalid response format');
+                throw new Error(data.message || 'Invalid response format');
             }
         } catch (error) {
             console.error('Error:', error);
             loadingMessage.remove();
             // Show error message
-            const errorMessage = createErrorMessage();
+            const errorMessage = createErrorMessage(error.message);
             messagesContainer.appendChild(errorMessage);
             scrollToBottom();
         }
@@ -125,12 +127,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Create error message element
-    function createErrorMessage() {
+    function createErrorMessage(message) {
         const div = document.createElement('div');
         div.className = 'message message-error';
         div.innerHTML = `
             <div class="message-content">
-                Failed to send message. Please try again.
+                ${message || 'Failed to send message. Please try again.'}
             </div>
         `;
         return div;
