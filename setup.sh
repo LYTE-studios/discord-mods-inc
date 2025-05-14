@@ -258,9 +258,13 @@ docker compose down --remove-orphans
 
 # Create Docker volumes with proper permissions
 print_status "Creating Docker volumes..."
-docker volume rm discord-mods-inc_static_volume discord-mods-inc_media_volume || true
+docker volume rm discord-mods-inc_static_volume discord-mods-inc_media_volume discord-mods-inc_certs || true
 docker volume create discord-mods-inc_static_volume
 docker volume create discord-mods-inc_media_volume
+docker volume create discord-mods-inc_certs
+
+# Set up SSL certificates
+setup_ssl
 
 # Build and start Docker containers
 print_status "Building and starting containers..."
