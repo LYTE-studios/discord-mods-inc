@@ -9,19 +9,7 @@
 </head>
 
 <body>
-    <header>
-        <nav class="main-nav">
-            <div class="nav-brand">AI Team Platform</div>
-            <div class="nav-user">
-                {% if user.is_authenticated %}
-                <span>{{ user.username }}</span>
-                <a href="{% url 'users:logout' %}" class="btn-logout">Logout</a>
-                {% endif %}
-            </div>
-        </nav>
-    </header>
-
-    <main class="container">
+    <main>
         {% block content %}{% endblock %}
     </main>
 

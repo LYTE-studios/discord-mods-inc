@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
+from django.utils import timezone
 from datetime import datetime
 import logging
 from .models import Conversation, Message
@@ -24,7 +25,7 @@ class ChatListView(LoginRequiredMixin, View):
         conversations = Conversation.objects.filter(
             user=request.user,
             chat_type=chat_type
-        ).order_by('-updated_at')
+        ).order_by('updated_at')  # Order by oldest first
         
         context = {
             'conversations': conversations,
@@ -54,6 +55,9 @@ class ChatListView(LoginRequiredMixin, View):
                 chat_type
             )
 
+            # Get current time in UTC
+            current_time = datetime.now(timezone.utc)
+
             if is_ajax:
                 # Return JSON response for AJAX requests
                 return JsonResponse({
@@ -61,7 +65,7 @@ class ChatListView(LoginRequiredMixin, View):
                     'message': {
                         'content': ai_response,
                         'is_ai': True,
-                        'created_at': datetime.now().strftime('%H:%M')
+                        'created_at': current_time.astimezone().strftime('%H:%M')
                     }
                 })
             else:
