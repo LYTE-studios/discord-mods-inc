@@ -48,6 +48,22 @@ class ChatListView(LoginRequiredMixin, View):
             return redirect('chat:list')
 
         try:
+            # Create a new conversation
+            conversation = Conversation.objects.create(
+                user=request.user,
+                chat_type=chat_type,
+                title=f"Chat with {chat_type.upper()}"
+            )
+
+            # Create user message
+            Message.objects.create(
+                conversation=conversation,
+                user=request.user,
+                content=message_content,
+                is_ai=False,
+                created_at=timezone.now()
+            )
+
             # Generate AI response
             from web.core.ai.conversation_manager import conversation_manager
             ai_response = conversation_manager.generate_response(
@@ -55,8 +71,14 @@ class ChatListView(LoginRequiredMixin, View):
                 chat_type
             )
 
-            # Get current time in UTC
-            current_time = datetime.now(timezone.utc)
+            # Create AI message
+            ai_message = Message.objects.create(
+                conversation=conversation,
+                user=request.user,  # Use same user for DB constraint
+                content=ai_response,
+                is_ai=True,
+                created_at=timezone.now()
+            )
 
             if is_ajax:
                 # Return JSON response for AJAX requests
@@ -65,7 +87,7 @@ class ChatListView(LoginRequiredMixin, View):
                     'message': {
                         'content': ai_response,
                         'is_ai': True,
-                        'created_at': current_time.astimezone().strftime('%H:%M')
+                        'created_at': timezone.localtime(ai_message.created_at).strftime('%H:%M')
                     }
                 })
             else:

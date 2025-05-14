@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setProcessingState(true);
 
         // Add user message immediately
-        const userMessage = createMessageElement(messageContent, false);
+        const userMessage = createMessageElement(messageContent, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         messagesContainer.appendChild(userMessage);
         scrollToBottom();
 
@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Add AI response
             if (data.status === 'success' && data.message) {
-                const aiMessageElement = createMessageElement(data.message.content, true);
+                const aiMessageElement = createMessageElement(data.message.content, true, data.message.created_at);
                 messagesContainer.appendChild(aiMessageElement);
                 scrollToBottom();
             } else {
@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Create message element
-    function createMessageElement(content, isAi) {
+    function createMessageElement(content, isAi, timestamp) {
         const div = document.createElement('div');
         div.className = `message ${isAi ? 'message-ai' : 'message-user'}`;
         const author = isAi ? 
@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', function() {
         div.innerHTML = `
             <div class="message-header">
                 <span class="message-author">${author}</span>
-                <span class="message-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                <span class="message-time">${timestamp}</span>
             </div>
             <div class="message-content">${content}</div>
         `;
