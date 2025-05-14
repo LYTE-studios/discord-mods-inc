@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import JsonResponse
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 
