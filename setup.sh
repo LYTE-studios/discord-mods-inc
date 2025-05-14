@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Check if running as root
-if [ "$EUID" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ]; then
     echo "Please run as root (use sudo)"
     exit 1
 fi
@@ -32,19 +32,19 @@ trap cleanup EXIT
 # Check for required tools
 check_requirements() {
     # Check Docker
-    if ! which docker &> /dev/null && ! test -x "/usr/bin/docker"; then
+    if ! docker --version &> /dev/null; then
         print_error "Docker is not installed. Please install Docker first."
         exit 1
     fi
     
-    # Check Docker Compose
-    if ! which docker-compose &> /dev/null && ! which "docker compose" &> /dev/null && ! test -x "/usr/bin/docker-compose"; then
+    # Check Docker Compose (try both new and legacy versions)
+    if ! (docker compose version &> /dev/null || docker-compose --version &> /dev/null); then
         print_error "Docker Compose is not installed. Please install Docker Compose first."
         exit 1
     fi
     
     # Check rsync
-    if ! which rsync &> /dev/null && ! test -x "/usr/bin/rsync"; then
+    if ! rsync --version &> /dev/null; then
         print_error "rsync is not installed. Please install rsync first."
         exit 1
     fi
