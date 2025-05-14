@@ -173,21 +173,27 @@ setup_ssl() {
         apt-get install -y certbot python3-certbot-nginx
     fi
 
-    # Ensure nginx is not running
-    docker compose stop nginx
+    # Start nginx temporarily for certbot
+    docker compose up -d nginx
+
+    # Wait for nginx to be ready
+    print_status "Waiting for nginx to start..."
+    sleep 5
 
     # Get SSL certificate
     if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
         print_status "Obtaining SSL certificate..."
-        certbot certonly --standalone \
+        EMAIL_ARG="--email ${SSL_EMAIL}"
+        certbot --nginx \
             --non-interactive \
             --agree-tos \
-            --email "$SSL_EMAIL" \
+            $EMAIL_ARG \
             --domains "$DOMAIN" \
-            --preferred-challenges http
+            --redirect
 
         if [ $? -ne 0 ]; then
             print_error "Failed to obtain SSL certificate"
+            docker compose stop nginx
             exit 1
         fi
     else
