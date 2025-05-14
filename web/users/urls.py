@@ -11,5 +11,5 @@ app_name = 'users'
 urlpatterns = [
     path('login/', views.LoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
-    path('', include(router.urls)),
+    path('api/', include(router.urls)),  # Move API routes under /api/
 ]

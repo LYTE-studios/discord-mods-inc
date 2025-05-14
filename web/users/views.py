@@ -11,7 +11,7 @@ User = get_user_model()
 class LoginView(View):
     def get(self, request):
         if request.user.is_authenticated:
-            return redirect('chat:list')
+            return redirect('/')  # Redirect to root which is now the chat list
         return render(request, 'users/login.html')
 
     def post(self, request):
@@ -23,7 +23,7 @@ class LoginView(View):
         if user is not None:
             if not User.objects.filter(is_superuser=True).exists() or user.is_superuser:
                 login(request, user)
-                return redirect('chat:list')
+                return redirect('/')  # Redirect to root which is now the chat list
             else:
                 return render(request, 'users/login.html', {'error': 'Only superusers are allowed to login'})
         else:

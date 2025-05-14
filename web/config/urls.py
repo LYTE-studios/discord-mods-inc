@@ -8,9 +8,12 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # API routes
     path('api/chat/', include('web.chat.urls', namespace='chat_api')),
     path('api/users/', include('web.users.urls', namespace='users_api')),
-    path('', include('web.users.urls')),  # Include user URLs at root for auth views
+    # Auth routes
+    path('auth/', include('web.users.urls')),  # Move auth routes under /auth/
+    # Main app routes - chat as the main interface
     path('', include('web.chat.urls')),  # Chat interface as main page
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
