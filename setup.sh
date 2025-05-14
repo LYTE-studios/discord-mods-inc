@@ -1,4 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    echo "Please run as root (use sudo)"
+    exit 1
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -25,37 +31,50 @@ trap cleanup EXIT
 
 # Check for required tools
 check_requirements() {
-    if ! command -v docker &> /dev/null; then
+    # Check Docker
+    if ! which docker &> /dev/null && ! test -x "/usr/bin/docker"; then
         print_error "Docker is not installed. Please install Docker first."
         exit 1
     fi
     
-    if ! command -v docker compose &> /dev/null; then
+    # Check Docker Compose
+    if ! which docker-compose &> /dev/null && ! which "docker compose" &> /dev/null && ! test -x "/usr/bin/docker-compose"; then
         print_error "Docker Compose is not installed. Please install Docker Compose first."
         exit 1
     fi
     
-    if ! command -v rsync &> /dev/null; then
+    # Check rsync
+    if ! which rsync &> /dev/null && ! test -x "/usr/bin/rsync"; then
         print_error "rsync is not installed. Please install rsync first."
+        exit 1
+    fi
+    
+    # Verify Docker daemon is running
+    if ! docker info &> /dev/null; then
+        print_error "Docker daemon is not running. Please start the Docker service."
         exit 1
     fi
 }
 
 # Function to print status messages
 print_status() {
-    echo -e "${GREEN}[+] $1${NC}"
+    echo "${GREEN}[+] $1${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[!] $1${NC}"
+    echo "${YELLOW}[!] $1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}[-] $1${NC}"
+    echo "${RED}[-] $1${NC}"
 }
 
 # Set up error handling
 set -e
+
+# Check requirements first
+print_status "Checking system requirements..."
+check_requirements
 
 # Create project directory if it doesn't exist
 if [ ! -d "$PROJECT_DIR" ]; then
