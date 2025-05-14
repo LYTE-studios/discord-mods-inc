@@ -67,14 +67,15 @@ EXPOSE 8000
 ENTRYPOINT ["docker-entrypoint.sh"]
 
 # Default command with optimized settings
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", \
-     "--workers", "2", \
-     "--threads", "4", \
-     "--worker-class", "gthread", \
-     "--worker-tmp-dir", "/dev/shm", \
-     "--timeout", "120", \
-     "--keepalive", "32", \
-     "--max-requests", "1000", \
-     "--max-requests-jitter", "50", \
-     "--chdir", "/app", \
+CMD ["gunicorn", \
+     "--bind=0.0.0.0:8000", \
+     "--workers=2", \
+     "--threads=4", \
+     "--worker-class=gthread", \
+     "--worker-tmp-dir=/dev/shm", \
+     "--timeout=120", \
+     "--keep-alive=32", \
+     "--max-requests=1000", \
+     "--max-requests-jitter=50", \
+     "--chdir=/app", \
      "web.config.wsgi:application"]
