@@ -32,6 +32,19 @@ wait_for_redis() {
 
 echo "Running startup checks..."
 
+# Check required environment variables
+required_vars=(
+    "REDIS_HOST" "REDIS_PORT"
+    "POSTGRES_DB" "POSTGRES_USER" "POSTGRES_PASSWORD" "POSTGRES_HOST"
+    "SUPABASE_URL" "SUPABASE_KEY"
+)
+for var in "${required_vars[@]}"; do
+    if [ -z "${!var}" ]; then
+        echo "Error: Required environment variable $var is not set"
+        exit 1
+    fi
+done
+
 # Wait for Redis
 wait_for_redis
 

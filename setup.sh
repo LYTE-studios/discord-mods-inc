@@ -77,6 +77,7 @@ setup_env() {
         DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
         JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
         ENCRYPTION_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+        DB_PASSWORD=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
         
         cat > .env << EOL
 # Web Configuration
@@ -85,23 +86,47 @@ DJANGO_DEBUG=False
 ALLOWED_HOSTS=gideon.lytestudios.be
 DOMAIN=gideon.lytestudios.be
 
-# Redis settings (required)
+# Database Configuration
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+POSTGRES_DB=discord_mods
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=${DB_PASSWORD}
+SUPABASE_URL=postgresql://postgres:${DB_PASSWORD}@db:5432/discord_mods
+SUPABASE_KEY=${DB_PASSWORD}
+
+# Redis Configuration
 REDIS_HOST=redis
 REDIS_PORT=6379
 
-# SSL settings
+# Security Configuration
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
+JWT_SECRET_KEY=${JWT_SECRET_KEY}
+
+# SSL Configuration
 SSL_EMAIL=admin@lytestudios.be
 
-# Security settings
-JWT_SECRET_KEY=${JWT_SECRET_KEY}
-ENCRYPTION_KEY=${ENCRYPTION_KEY}
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE=bot.log
 EOL
         chmod 600 .env
     fi
 
     # Validate required environment variables
     print_status "Validating environment variables..."
-    required_vars=("DJANGO_SECRET_KEY" "ALLOWED_HOSTS" "REDIS_HOST" "REDIS_PORT")
+    required_vars=(
+        "DJANGO_SECRET_KEY"
+        "ALLOWED_HOSTS"
+        "REDIS_HOST"
+        "REDIS_PORT"
+        "POSTGRES_DB"
+        "POSTGRES_USER"
+        "POSTGRES_PASSWORD"
+        "POSTGRES_HOST"
+        "SUPABASE_URL"
+        "SUPABASE_KEY"
+    )
     missing_vars=()
     
     while IFS= read -r line; do
