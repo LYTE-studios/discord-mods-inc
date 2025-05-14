@@ -17,7 +17,10 @@ class ChatListView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['conversations'] = Conversation.objects.filter(user=self.request.user)
+        context['conversations'] = Conversation.objects.filter(
+            user=self.request.user,
+            is_cto_chat=True
+        )
         return context
 
 class ChatRoomView(LoginRequiredMixin, TemplateView):
@@ -32,8 +35,13 @@ class ChatRoomView(LoginRequiredMixin, TemplateView):
         pk = self.kwargs.get('pk')
         
         if pk:
-            # Existing conversation
-            conversation = get_object_or_404(Conversation, pk=pk, user=self.request.user)
+            # Existing CTO conversation
+            conversation = get_object_or_404(
+                Conversation,
+                pk=pk,
+                user=self.request.user,
+                is_cto_chat=True
+            )
             context['conversation'] = conversation
             context['messages'] = conversation.messages.all().order_by('created_at')
         else:
@@ -59,15 +67,18 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Get conversations for the current user.
+        Get CTO conversations for the current user.
         """
-        return Conversation.objects.filter(user=self.request.user)
+        return Conversation.objects.filter(
+            user=self.request.user,
+            is_cto_chat=True
+        )
 
     def perform_create(self, serializer):
         """
-        Create a new conversation for the current user.
+        Create a new CTO conversation for the current user.
         """
-        serializer.save(user=self.request.user)
+        serializer.save(user=self.request.user, is_cto_chat=True)
 
     @action(detail=True, methods=['post'])
     def send_message(self, request, pk=None):

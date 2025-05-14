@@ -13,6 +13,7 @@ class Conversation(models.Model):
     title = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_cto_chat = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-updated_at']

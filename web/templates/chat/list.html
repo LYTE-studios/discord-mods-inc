@@ -3,8 +3,7 @@
 {% block content %}
 <div class="conversations-container">
     <div class="conversations-header">
-        <h1>Your Conversations</h1>
-        <a href="{% url 'chat:chat_room' %}" class="btn-new">New Conversation</a>
+        <h1>Your CTO Chat History</h1>
     </div>
 
     <div class="conversations-list">
@@ -30,8 +29,8 @@
         {% endfor %}
         {% else %}
         <div class="no-conversations">
-            <p>No conversations yet.</p>
-            <p>Start a new conversation to interact with the AI team!</p>
+            <p>No CTO conversations yet.</p>
+            <p>Your CTO chat history will appear here.</p>
         </div>
         {% endif %}
     </div>
