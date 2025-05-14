@@ -162,76 +162,6 @@ print_status "Stopping existing nginx service..."
 sudo systemctl stop nginx || true
 sudo systemctl disable nginx || true
 
-# Function to install and configure certbot
-setup_ssl() {
-    print_status "Setting up SSL..."
-    
-    # Create webroot directory
-    mkdir -p /var/www/certbot
-    
-    # Install certbot
-    if ! command -v certbot &> /dev/null; then
-        print_status "Installing certbot..."
-        apt-get update
-        apt-get install -y certbot
-    fi
-
-    # Start nginx with webroot configuration
-    docker compose up -d nginx
-
-    # Wait for nginx to be ready
-    print_status "Waiting for nginx to start..."
-    sleep 5
-
-    # Get SSL certificate using webroot plugin
-    if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
-        print_status "Obtaining SSL certificate..."
-        certbot certonly \
-            --webroot \
-            --webroot-path /var/www/certbot \
-            --non-interactive \
-            --agree-tos \
-            --email "${SSL_EMAIL}" \
-            --domains "${DOMAIN}" \
-            --rsa-key-size 4096
-
-        if [ $? -ne 0 ]; then
-            print_error "Failed to obtain SSL certificate"
-            docker compose stop nginx
-            exit 1
-        fi
-
-        # Update nginx configuration for SSL
-        if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
-            print_status "Configuring nginx for SSL..."
-            docker compose restart nginx
-        fi
-    else
-        print_warning "SSL certificate already exists"
-    fi
-
-    # Create SSL directory in Docker volume
-    print_status "Setting up SSL certificates for nginx..."
-    docker volume create discord-mods-inc_certs
-
-    # Copy certificates to Docker volume
-    docker run --rm \
-        -v discord-mods-inc_certs:/certs \
-        -v /etc/letsencrypt:/etc/letsencrypt:ro \
-        alpine sh -c "mkdir -p /certs && cp -rL /etc/letsencrypt/live/$DOMAIN/* /certs/"
-
-    # Set up auto-renewal
-    print_status "Setting up auto-renewal..."
-    cat > /etc/cron.weekly/renew-cert << EOF
-#!/bin/bash
-certbot renew --quiet
-docker compose restart nginx
-EOF
-    chmod +x /etc/cron.weekly/renew-cert
-
-    # Start nginx
-    docker compose up -d nginx
-}
 
 # Create necessary directories
 print_status "Creating project directories..."
@@ -274,13 +204,9 @@ docker compose down --remove-orphans
 
 # Create Docker volumes with proper permissions
 print_status "Creating Docker volumes..."
-docker volume rm discord-mods-inc_static_volume discord-mods-inc_media_volume discord-mods-inc_certs || true
+docker volume rm discord-mods-inc_static_volume discord-mods-inc_media_volume || true
 docker volume create discord-mods-inc_static_volume
 docker volume create discord-mods-inc_media_volume
-docker volume create discord-mods-inc_certs
-
-# Set up SSL certificates
-setup_ssl
 
 # Build and start Docker containers
 print_status "Building and starting containers..."
@@ -328,11 +254,8 @@ sudo cp .env "/var/www/$DOMAIN/"
 sudo chown -R "$USERNAME:$USERNAME" "/var/www/$DOMAIN"
 sudo chmod 755 "/var/www/$DOMAIN"
 
-# Set up SSL certificates
-setup_ssl
-
 print_status "Setup completed successfully!"
 print_warning "Please ensure you have:"
 print_warning "1. Updated the .env file with your credentials"
 print_warning "2. Verified DNS records for $DOMAIN are pointing to this server"
-print_warning "Your site is available at https://$DOMAIN"
+print_warning "Your site is available at http://$DOMAIN"
