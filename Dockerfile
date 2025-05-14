@@ -12,6 +12,7 @@ RUN apt-get update \
         curl \
         netcat \
         libpq-dev \
+        gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Create and set working directory
