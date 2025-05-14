@@ -47,7 +47,7 @@
         </div>
 
         <!-- Message History -->
-        <div class="messages-container">
+        <div class="messages-container" id="messagesContainer">
             {% if conversations %}
             {% for conversation in conversations %}
             <div class="message {% if conversation.user == request.user %}message-user{% else %}message-ai{% endif %}">
@@ -79,25 +79,26 @@
             {% endif %}
         </div>
 
-        <!-- Message Input -->
-        <div class="message-input">
-            <form id="messageForm" class="input-form" method="POST">
-                {% csrf_token %}
-                <div class="input-wrapper">
-                    <textarea id="messageText" name="message"
-                        placeholder="Message {{ current_chat_type|upper }}... (Press Enter to send)"
-                        rows="1"></textarea>
-                    <button type="submit" class="btn-send">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="22" y1="2" x2="11" y2="13"></line>
-                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                        </svg>
-                    </button>
-                </div>
-            </form>
-        </div>
     </main>
+    </main>
+
+    <!-- Message Input (Fixed at bottom) -->
+    <div class="message-input">
+        <form id="messageForm" class="input-form" method="POST">
+            {% csrf_token %}
+            <div class="input-wrapper">
+                <textarea id="messageText" name="message"
+                    placeholder="Message {{ current_chat_type|upper }}... (Press Enter to send)" rows="1"></textarea>
+                <button type="submit" class="btn-send">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <style>
@@ -210,7 +211,8 @@
 
     .messages-container {
         flex: 1;
-        padding: 1rem;
+        padding: 1rem 1rem 80px 1rem;
+        /* Added bottom padding for fixed input */
         overflow-y: auto;
         display: flex;
         flex-direction: column;
@@ -288,9 +290,15 @@
     }
 
     .message-input {
+        position: fixed;
+        bottom: 0;
+        left: 240px;
+        /* Sidebar width */
+        right: 0;
         padding: 1rem;
         background-color: #ffffff;
         border-top: 1px solid #e5e7eb;
+        z-index: 100;
     }
 
     .input-wrapper {
@@ -302,6 +310,8 @@
         border-radius: 0.5rem;
         padding: 0.5rem;
         transition: border-color 0.2s;
+        max-width: 1200px;
+        margin: 0 auto;
     }
 
     .input-wrapper:focus-within {
