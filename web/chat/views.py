@@ -41,7 +41,7 @@ class ChatListView(LoginRequiredMixin, View):
                 title=f"Chat with {chat_type.upper()}"
             )
 
-            # Create the message
+            # Create the user message
             Message.objects.create(
                 conversation=conversation,
                 user=request.user,
@@ -49,11 +49,39 @@ class ChatListView(LoginRequiredMixin, View):
                 is_ai=False
             )
 
-            # Redirect to the new conversation
-            return redirect('chat:chat_room', pk=conversation.id)
+            # Generate AI response
+            from web.core.ai.conversation_manager import ConversationManager
+            conversation_manager = ConversationManager()
+            ai_response = conversation_manager.generate_response(
+                message_content,
+                chat_type
+            )
 
-        # If no message content, redirect back to the chat list
-        return redirect(f'/?type={chat_type}')
+            # Create the AI message
+            Message.objects.create(
+                conversation=conversation,
+                user=None,
+                content=ai_response,
+                is_ai=True
+            )
+
+            # Return JSON response with conversation data
+            return JsonResponse({
+                'status': 'success',
+                'conversation': {
+                    'id': conversation.id,
+                    'messages': [
+                        {
+                            'content': msg.content,
+                            'is_ai': msg.is_ai,
+                            'created_at': msg.created_at.strftime('%H:%M')
+                        }
+                        for msg in conversation.messages.all()
+                    ]
+                }
+            })
+
+        return JsonResponse({'status': 'error', 'message': 'No message content provided'}, status=400)
 
 
 class ChatRoomView(LoginRequiredMixin, TemplateView):

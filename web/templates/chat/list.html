@@ -352,6 +352,60 @@
 </style>
 
 {% block extra_scripts %}
+<script>
+    const current_chat_type = '{{ current_chat_type }}';
+</script>
 <script src="/static/js/chat.js"></script>
+<style>
+    .message-loading .message-content {
+        min-height: 24px;
+    }
+
+    .typing-indicator {
+        display: flex;
+        gap: 4px;
+        padding: 4px 0;
+    }
+
+    .typing-indicator span {
+        width: 8px;
+        height: 8px;
+        background-color: #64748b;
+        border-radius: 50%;
+        animation: typing 1s infinite;
+        opacity: 0.3;
+    }
+
+    .typing-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .typing-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+
+        0%,
+        100% {
+            transform: translateY(0);
+            opacity: 0.3;
+        }
+
+        50% {
+            transform: translateY(-4px);
+            opacity: 1;
+        }
+    }
+
+    .message-error {
+        background-color: #fee2e2;
+        color: #991b1b;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        margin: 1rem 0;
+        text-align: center;
+    }
+</style>
 {% endblock %}
 {% endblock %}
