@@ -101,7 +101,7 @@ ENCRYPTION_KEY=${ENCRYPTION_KEY}
 JWT_SECRET_KEY=${JWT_SECRET_KEY}
 
 # SSL Configuration
-SSL_EMAIL=hello@lytestudios.be
+SSL_EMAIL=tanguy@lytestudios.be
 
 # Logging Configuration
 LOG_LEVEL=INFO
