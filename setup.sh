@@ -77,7 +77,6 @@ setup_env() {
         DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
         JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
         ENCRYPTION_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
-        DB_PASSWORD=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
         
         cat > .env << EOL
 # Web Configuration
@@ -87,13 +86,11 @@ ALLOWED_HOSTS=gideon.lytestudios.be
 DOMAIN=gideon.lytestudios.be
 
 # Database Configuration
-POSTGRES_HOST=db
+POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=discord_mods
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=${DB_PASSWORD}
-SUPABASE_URL=postgresql://postgres:${DB_PASSWORD}@db:5432/discord_mods
-SUPABASE_KEY=${DB_PASSWORD}
+POSTGRES_PASSWORD=your_database_password
 
 # Redis Configuration
 REDIS_HOST=redis
@@ -124,8 +121,6 @@ EOL
         "POSTGRES_USER"
         "POSTGRES_PASSWORD"
         "POSTGRES_HOST"
-        "SUPABASE_URL"
-        "SUPABASE_KEY"
     )
     missing_vars=()
     

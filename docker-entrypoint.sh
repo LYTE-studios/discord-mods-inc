@@ -36,7 +36,6 @@ echo "Running startup checks..."
 required_vars=(
     "REDIS_HOST" "REDIS_PORT"
     "POSTGRES_DB" "POSTGRES_USER" "POSTGRES_PASSWORD" "POSTGRES_HOST"
-    "SUPABASE_URL" "SUPABASE_KEY"
 )
 for var in "${required_vars[@]}"; do
     if [ -z "${!var}" ]; then
