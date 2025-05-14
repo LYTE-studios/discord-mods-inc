@@ -1,94 +1,14 @@
-from typing import List, Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
+from venv import logger
 import openai
 from tenacity import retry, stop_after_attempt, wait_exponential
-import tiktoken
-from datetime import datetime, timezone
 from config import settings
-from utils.logger import logger
-from database.supabase_client import db
-from .personality_types import (
-    PersonalityType, get_personality_config,
-    get_system_prompt, get_task_prompt,
-    get_review_prompt, get_collaboration_prompt
-)
-
-class Message:
-    def __init__(self, role: str, content: str):
-        self.role = role
-        self.content = content
-        self.tokens = self._count_tokens(content)
-        self.timestamp = datetime.now(timezone.utc)
-
-    def _count_tokens(self, text: str) -> int:
-        """Count tokens in text using tiktoken"""
-        try:
-            encoding = tiktoken.encoding_for_model(settings.OPENAI_MODEL)
-            return len(encoding.encode(text))
-        except Exception as e:
-            logger.error(f"Error counting tokens: {str(e)}")
-            return len(text) // 4  # Rough estimation
-
-    def to_dict(self) -> Dict[str, str]:
-        return {"role": self.role, "content": self.content}
-
-class ConversationContext:
-    def __init__(self):
-        self.current_task: Optional[str] = None
-        self.related_tickets: List[str] = []
-        self.github_context: Dict = {}
-        self.collaboration_history: List[Dict] = []
-        self.last_code_review: Optional[Dict] = None
-
-class Conversation:
-    def __init__(self, personality_type: PersonalityType):
-        self.personality_type = personality_type
-        self.messages: List[Message] = []
-        self.total_tokens = 0
-        self.max_tokens = 4000  # Conservative limit for context window
-        self.context = ConversationContext()
-        
-        # Initialize with system message
-        system_prompt = get_system_prompt(personality_type)
-        self.add_message("system", system_prompt)
-
-    def add_message(self, role: str, content: str) -> None:
-        """Add a message to the conversation"""
-        message = Message(role, content)
-        
-        # Check if adding this message would exceed token limit
-        while self.total_tokens + message.tokens > self.max_tokens:
-            # Remove oldest non-system message
-            for i, msg in enumerate(self.messages):
-                if msg.role != "system":
-                    self.total_tokens -= msg.tokens
-                    self.messages.pop(i)
-                    break
-        
-        self.messages.append(message)
-        self.total_tokens += message.tokens
-
-    def get_messages(self) -> List[Dict[str, str]]:
-        """Get messages in format required by OpenAI API"""
-        return [msg.to_dict() for msg in self.messages]
-
-    def update_context(self, **kwargs) -> None:
-        """Update conversation context"""
-        for key, value in kwargs.items():
-            if hasattr(self.context, key):
-                setattr(self.context, key, value)
+from web.chat.models import Conversation
+from .personality_types import PersonalityType, get_collaboration_prompt, get_review_prompt, get_task_prompt
 
 class ConversationManager:
     def __init__(self):
-        self.conversations: Dict[str, Conversation] = {}
         openai.api_key = settings.OPENAI_API_KEY
-
-    def get_or_create_conversation(
-        self, conversation_id: str, personality_type: PersonalityType
-    ) -> Conversation:
-        """Get existing conversation or create new one"""
-        if conversation_id not in self.conversations:
-            self.conversations[conversation_id] = Conversation(personality_type)
-        return self.conversations[conversation_id]
 
     @retry(
         stop=stop_after_attempt(3),
@@ -242,13 +162,28 @@ class ConversationManager:
     ) -> str:
         """Synchronous method to generate a response"""
         try:
+            # Get personality type
             personality_type = PersonalityType.CTO if chat_type == 'cto' else PersonalityType.DEVELOPER
-            conversation = Conversation(personality_type)
-            conversation.add_message("user", message)
             
+            # Create system message based on role
+            system_message = (
+                "You are an AI Chief Technical Officer, focused on technical leadership and strategic decisions. "
+                "Provide guidance with a focus on architecture, best practices, and technical direction."
+                if chat_type == 'cto' else
+                "You are an AI Developer, focused on implementation details and coding practices. "
+                "Provide specific technical advice and coding guidance."
+            )
+            
+            # Create messages array
+            messages = [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": message}
+            ]
+            
+            # Get response from OpenAI
             response = openai.ChatCompletion.create(
                 model=settings.OPENAI_MODEL,
-                messages=conversation.get_messages(),
+                messages=messages,
                 temperature=0.7,
                 max_tokens=settings.OPENAI_MAX_TOKENS,
                 n=1,
@@ -256,11 +191,10 @@ class ConversationManager:
                 frequency_penalty=0.0,
             )
             
-            ai_message = response.choices[0].message.content
-            return ai_message
+            return response.choices[0].message.content
 
         except Exception as e:
-            logger.error(f"Error generating response: {str(e)}")
+            print(f"Error generating response: {str(e)}")
             return "I apologize, but I'm having trouble processing your request right now."
 
 # Global instance
