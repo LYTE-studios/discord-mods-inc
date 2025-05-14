@@ -1,238 +1,158 @@
-# Deployment Guide
+# Optimized Deployment Guide
 
-This guide covers the deployment process for the AI Team Platform on Ubuntu servers.
+## Overview
+This guide describes the optimized deployment setup for the Discord Mods Inc project. The setup has been optimized for resource efficiency and performance.
 
-## Prerequisites
+## System Requirements
 
-- Ubuntu 20.04 LTS or newer
-- Domain name pointed to your server (A record for `gideon.lytestudios.be`)
-- Root access to the server
-- Minimum requirements:
-  - 2 CPU cores
-  - 4GB RAM
-  - 20GB storage
+Minimum requirements:
+- 1GB RAM
+- 1 CPU core
+- 20GB disk space
 
-## Required Environment Variables
+Recommended:
+- 2GB RAM
+- 2 CPU cores
+- 40GB disk space
 
-Create a `.env` file with the following variables:
+## Resource Allocation
 
-```env
-DJANGO_SECRET_KEY=your_secret_key
-DJANGO_DEBUG=False
-ALLOWED_HOSTS=gideon.lytestudios.be
-DOMAIN=gideon.lytestudios.be
+Services are configured with the following resource limits:
 
-# Database settings
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
-SUPABASE_DB_NAME=postgres
-SUPABASE_DB_USER=postgres
-SUPABASE_DB_PASSWORD=your_db_password
+- Web: 512MB RAM, 0.5 CPU
+- Nginx: 128MB RAM, 0.2 CPU
+- Redis: 256MB RAM, 0.2 CPU
+- Celery: 384MB RAM, 0.3 CPU
 
-# Redis settings
-REDIS_HOST=redis
-REDIS_PORT=6379
-
-# SSL settings
-SSL_EMAIL=your_email@example.com
-
-# API Keys
-OPENAI_API_KEY=your_openai_key
-GITHUB_TOKEN=your_github_token
-JWT_SECRET_KEY=your_jwt_secret
-ENCRYPTION_KEY=your_encryption_key
-```
-
-## Domain Setup
-
-1. Point your domain to your server's IP address using an A record:
-   ```
-   Type: A
-   Name: gideon
-   Value: your_server_ip
-   TTL: 3600
-   ```
-
-2. Wait for DNS propagation (can take up to 48 hours, but usually much faster)
+Total: ~1.3GB RAM, 1.2 CPU cores
 
 ## Deployment Steps
 
 1. Clone the repository:
-   ```bash
-   git clone [repository_url]
-   cd [repository_name]
-   ```
-
-2. Create and edit the `.env` file with your credentials:
-   ```bash
-   cp .env.example .env
-   nano .env
-   ```
-
-3. Run the setup script:
-   ```bash
-   chmod +x setup.sh
-   sudo ./setup.sh
-   ```
-
-4. The setup script will:
-   - Install required packages
-   - Configure Nginx
-   - Set up SSL certificates
-   - Start Docker containers
-   - Configure automatic SSL renewal
-
-## Post-Deployment Verification
-
-1. Check if services are running:
-   ```bash
-   docker-compose -f docker-compose.prod.yml ps
-   ```
-
-2. View logs:
-   ```bash
-   # All logs
-   docker-compose -f docker-compose.prod.yml logs
-
-   # Specific service logs
-   docker-compose -f docker-compose.prod.yml logs web
-   docker-compose -f docker-compose.prod.yml logs nginx
-   ```
-
-3. Test SSL:
-   ```bash
-   curl https://gideon.lytestudios.be
-   ```
-
-## Maintenance Procedures
-
-### Updating the Application
-
-1. Pull latest changes:
-   ```bash
-   git pull origin main
-   ```
-
-2. Rebuild and restart containers:
-   ```bash
-   docker-compose -f docker-compose.prod.yml up -d --build
-   ```
-
-### Backup Procedures
-
-1. Backup environment variables:
-   ```bash
-   cp .env .env.backup
-   ```
-
-2. Backup volumes:
-   ```bash
-   docker run --rm -v ai_team_static_volume:/source:ro -v /backup:/backup ubuntu tar czf /backup/static-backup.tar.gz -C /source ./
-   docker run --rm -v ai_team_media_volume:/source:ro -v /backup:/backup ubuntu tar czf /backup/media-backup.tar.gz -C /source ./
-   ```
-
-### SSL Certificate Renewal
-
-Certificates auto-renew via Certbot's cron job. To manually renew:
 ```bash
-sudo certbot renew
+git clone <repository-url>
+cd discord-mods-inc
 ```
 
-## Troubleshooting Guide
+2. Create and configure .env file:
+```bash
+cp .env.example .env
+# Edit .env with your settings
+```
 
-### Common Issues
+3. Run the setup script:
+```bash
+sudo bash setup.sh
+```
 
-1. **502 Bad Gateway**
-   - Check if Django service is running:
-     ```bash
-     docker-compose -f docker-compose.prod.yml logs web
-     ```
-   - Verify Nginx configuration:
-     ```bash
-     sudo nginx -t
-     ```
+4. Verify the deployment:
+```bash
+# Check service status
+docker compose ps
 
-2. **SSL Certificate Issues**
-   - Check certificate status:
-     ```bash
-     sudo certbot certificates
-     ```
-   - Renew certificates:
-     ```bash
-     sudo certbot renew --dry-run
-     ```
+# Check logs
+docker compose logs -f
 
-3. **Static Files Not Loading**
-   - Verify static files collection:
-     ```bash
-     docker-compose -f docker-compose.prod.yml exec web python manage.py collectstatic
-     ```
-   - Check Nginx static files configuration
-   - Verify volume mounts
+# Test health endpoints
+curl http://localhost/health/
+```
 
-4. **WebSocket Connection Failed**
-   - Check Nginx WebSocket configuration
-   - Verify Django Channels setup
-   - Check Redis connection
+## Monitoring
 
-### Checking Logs
+Health check endpoints are available at:
+- `/health/` - Application health
+- Each service has built-in health checks configured in docker-compose.yml
 
-1. **Nginx Logs**
-   ```bash
-   sudo tail -f /var/www/gideon.lytestudios.be/logs/nginx-*.log
-   ```
+## Security Features
 
-2. **Docker Logs**
-   ```bash
-   docker-compose -f docker-compose.prod.yml logs -f
-   ```
+1. Rate Limiting:
+   - General endpoints: 10 req/sec with burst of 20
+   - API endpoints: 5 req/sec with burst of 10
 
-3. **Application Logs**
-   ```bash
-   docker-compose -f docker-compose.prod.yml logs -f web
-   ```
+2. Security Headers:
+   - X-Frame-Options
+   - X-XSS-Protection
+   - X-Content-Type-Options
+   - Content-Security-Policy
+   - Referrer-Policy
 
-### Security Checks
+3. File Access:
+   - Restricted media file types
+   - Hidden files blocked
+   - Proper file permissions
 
-1. **SSL Configuration**
-   - Test SSL setup:
-     ```bash
-     curl https://www.ssllabs.com/ssltest/analyze.html?d=gideon.lytestudios.be
-     ```
+## Performance Optimizations
 
-2. **Firewall Status**
-   ```bash
-   sudo ufw status
-   ```
+1. Nginx:
+   - Gzip compression
+   - Static file caching
+   - Keepalive connections
+   - Optimized logging
+   - WebSocket support
 
-3. **Docker Security**
-   ```bash
-   docker info --format '{{.SecurityOptions}}'
-   ```
+2. Docker:
+   - Multi-stage builds
+   - Alpine-based images
+   - Resource limits
+   - Health checks
+   - Volume optimizations
 
-## Performance Optimization
+## Maintenance
 
-1. **Nginx Tuning**
-   - Edit `/etc/nginx/nginx.conf`
-   - Adjust worker processes and connections
-   - Configure caching parameters
+1. Logs:
+   - Located in /var/log/nginx/
+   - Configured with rate limiting and buffering
 
-2. **Redis Performance**
-   - Monitor Redis usage:
-     ```bash
-     docker-compose -f docker-compose.prod.yml exec redis redis-cli info
-     ```
+2. Backups:
+   - Media files in /app/web/media
+   - Static files in /app/web/staticfiles
+   - Redis data persisted in named volume
 
-3. **Application Performance**
-   - Monitor Django debug toolbar in development
-   - Use Django Silk for production profiling
-   - Monitor Celery tasks and queues
+3. Scaling:
+   - Adjust resource limits in docker-compose.yml
+   - Modify worker counts in Gunicorn/Celery settings
 
-## Support
+## Troubleshooting
 
-For additional support:
-1. Check the project's GitHub issues
-2. Review application logs
-3. Contact the development team
+1. Check service health:
+```bash
+docker compose ps
+```
 
-Remember to always backup data before making significant changes to the production environment.
+2. View logs:
+```bash
+docker compose logs -f [service_name]
+```
+
+3. Restart services:
+```bash
+docker compose restart [service_name]
+```
+
+4. Common issues:
+   - Permission errors: Check volume permissions
+   - Memory issues: Adjust resource limits
+   - Connection errors: Check health checks and logs
+
+## Updates
+
+To update the deployment:
+
+1. Pull latest changes:
+```bash
+git pull origin main
+```
+
+2. Rebuild and restart:
+```bash
+docker compose down
+docker compose up -d --build
+```
+
+## Notes
+
+- The setup uses Docker's built-in orchestration
+- Services are configured to restart automatically
+- Resource limits can be adjusted based on needs
+- Health checks ensure service availability
+- Security measures are in place for production use

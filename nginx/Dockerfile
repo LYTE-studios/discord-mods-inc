@@ -1,17 +1,24 @@
-FROM nginx:1.25
+FROM nginx:1.25-alpine
+
+# Install required packages
+RUN apk add --no-cache curl
 
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
 
 # Create necessary directories
-RUN mkdir -p /var/log/nginx && \
-    chown -R nginx:nginx /var/log/nginx
+RUN mkdir -p /var/log/nginx /app/web/staticfiles /app/web/media && \
+    chown -R nginx:nginx /var/log/nginx /app
 
 # Copy custom nginx config
 COPY default.conf /etc/nginx/conf.d/
 
-# Create static and media directories
-RUN mkdir -p /app/static /app/media && \
-    chown -R nginx:nginx /app
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD curl -f http://localhost/health/ || exit 1
 
-EXPOSE 80
+# Expose ports
+EXPOSE 80 443
+
+# Use non-root user
+USER nginx

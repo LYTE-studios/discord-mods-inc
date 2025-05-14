@@ -1,10 +1,11 @@
+version: '3.8'
+
 services:
   web:
     build:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - .:/app:delegated
       - static_volume:/app/web/staticfiles
       - media_volume:/app/web/media
     env_file:
@@ -13,9 +14,18 @@ services:
       - DJANGO_SETTINGS_MODULE=web.config.settings
       - PYTHONPATH=/app
     depends_on:
-      - redis
-    networks:
-      - web_network
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     restart: unless-stopped
 
   nginx:
@@ -23,71 +33,60 @@ services:
       context: ./nginx
       dockerfile: Dockerfile
     volumes:
-      - static_volume:/app/web/staticfiles
-      - media_volume:/app/web/media
-      - /var/log/nginx:/var/log/nginx
+      - static_volume:/app/web/staticfiles:ro
+      - media_volume:/app/web/media:ro
     ports:
       - "80:80"
       - "443:443"
     depends_on:
-      - web
-    networks:
-      - web_network
+      web:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     volumes:
       - redis_data:/data
-    networks:
-      - web_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
     restart: unless-stopped
 
   celery:
     build:
       context: .
       dockerfile: Dockerfile
-    volumes:
-      - .:/app:delegated
-      - static_volume:/app/web/staticfiles
-      - media_volume:/app/web/media
-    command: celery -A web.config worker -l INFO
+    command: celery -A web.config worker --concurrency=2 -l INFO
     env_file:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=web.config.settings
       - PYTHONPATH=/app
-    depends_on:
-      - redis
-    networks:
-      - web_network
-    restart: unless-stopped
-
-  celery-beat:
-    build:
-      context: .
-      dockerfile: Dockerfile
     volumes:
-      - .:/app:delegated
-      - static_volume:/app/web/staticfiles
       - media_volume:/app/web/media
-    command: celery -A web.config beat -l INFO
-    env_file:
-      - .env
-    environment:
-      - DJANGO_SETTINGS_MODULE=web.config.settings
-      - PYTHONPATH=/app
     depends_on:
-      - redis
-    networks:
-      - web_network
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 384M
     restart: unless-stopped
 
 volumes:
   static_volume:
   media_volume:
   redis_data:
-
-networks:
-  web_network:
-    driver: bridge

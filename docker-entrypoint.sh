@@ -1,44 +1,63 @@
 #!/bin/bash
 
-set -o errexit
-set -o pipefail
-set -o nounset
+# Exit on error
+set -e
 
-# Function to check Redis connection
-redis_ready() {
-    python << END
-import sys
-import redis
-try:
-    redis.Redis(
-        host="${REDIS_HOST}",
-        port=${REDIS_PORT},
-        socket_connect_timeout=1,
-    ).ping()
-except redis.ConnectionError:
-    sys.exit(-1)
-sys.exit(0)
-END
+# Handle signals
+trap 'kill -TERM $PID' TERM INT
+
+# Function to wait for Redis
+wait_for_redis() {
+    echo "Waiting for Redis..."
+    until timeout 1 bash -c "cat < /dev/null > /dev/tcp/${REDIS_HOST}/${REDIS_PORT}" 2>/dev/null
+    do
+        echo "Redis is unavailable - sleeping"
+        sleep 1
+    done
+    echo "Redis is up"
 }
 
-# Wait for Redis
-until redis_ready; do
-  >&2 echo "Waiting for Redis to become available..."
-  sleep 1
-done
->&2 echo "Redis is available"
+# Function to create health check endpoint
+setup_health_check() {
+    mkdir -p /app/web/health
+    cat > /app/web/health/views.py << 'EOF'
+from django.http import HttpResponse
 
-# Create and set permissions for static directories
-mkdir -p /app/web/staticfiles /app/web/media /app/web/static
-chown -R web:web /app/web/staticfiles /app/web/media /app/web/static
-chmod -R 777 /app/web/staticfiles /app/web/media /app/web/static
+def health_check(request):
+    return HttpResponse("OK")
+EOF
 
-# Run Django commands as web user
-gosu web python manage.py migrate --noinput
-gosu web python manage.py collectstatic --noinput
-gosu web python manage.py createcachetable
+    cat > /app/web/health/urls.py << 'EOF'
+from django.urls import path
+from . import views
 
-# Execute the main command as web user
-exec gosu web "$@"
+urlpatterns = [
+    path('', views.health_check, name='health_check'),
+]
+EOF
+
+    # Add health URLs to main URLs
+    if ! grep -q "health/" /app/web/config/urls.py; then
+        sed -i '/urlpatterns = \[/a \    path("health/", include("web.health.urls")),' /app/web/config/urls.py
+        sed -i '1i from django.urls import include' /app/web/config/urls.py
+    fi
+}
+
+# Wait for Redis to be ready
+wait_for_redis
+
+# Setup health check endpoint
+setup_health_check
+
+# Run migrations and collect static files
+python manage.py migrate --noinput
+python manage.py collectstatic --noinput
+python manage.py createcachetable
+
+# Start the main process
+echo "Starting process: $@"
+exec "$@" &
+PID=$!
+wait $PID
 
 # Note: Don't need the final exec "$@" as it's already handled by the previous exec

@@ -1,3 +1,25 @@
+# Build stage
+FROM python:3.11-slim-bullseye as builder
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Install build dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        gcc \
+        libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create and set working directory
+WORKDIR /build
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Final stage
 FROM python:3.11-slim-bullseye
 
 # Set environment variables
@@ -5,56 +27,42 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-# System dependencies
+# Install runtime dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential \
-        curl \
-        netcat \
-        libpq-dev \
+        libpq5 \
         gosu \
     && rm -rf /var/lib/apt/lists/*
 
-# Create and set working directory
-WORKDIR /app
-
-# Create a non-root user
+# Create app user
 RUN addgroup --system web \
     && adduser --system --ingroup web web
 
-# Copy entrypoint script and set permissions
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Create app directories
+WORKDIR /app
+RUN mkdir -p /app/web/{staticfiles,media,static} \
+    && chown -R web:web /app \
+    && chmod -R 755 /app \
+    && chmod -R 777 /app/web/{staticfiles,media,static}
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install pytest pytest-django pytest-cov pytest-asyncio
-
-# Create necessary directories
-RUN mkdir -p /app/web/staticfiles /app/web/media /app/web/static
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages/ /usr/local/lib/python3.11/site-packages/
 
 # Copy project files
-COPY . /app/
+COPY --chown=web:web . /app/
 
-# Set permissions
-RUN chown -R web:web /app \
-    && chmod -R 755 /app \
-    && chmod -R 777 /app/web/staticfiles /app/web/media /app/web/static \
-    && chmod g+s /app/web/staticfiles /app/web/media /app/web/static
-
-# Make entrypoint script run as root for directory creation
-RUN chown root:root /usr/local/bin/docker-entrypoint.sh \
-    && chmod 755 /usr/local/bin/docker-entrypoint.sh
+# Copy and set up entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Switch to non-root user
 USER web
 
-# Expose the port the app runs on
+# Expose the port
 EXPOSE 8000
 
-# Set the entrypoint script
+# Set the entrypoint
 ENTRYPOINT ["docker-entrypoint.sh"]
 
-# Default command
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120", "web.config.wsgi:application"]
+# Default command (2 workers is usually enough for most cases)
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120", "web.config.wsgi:application"]
