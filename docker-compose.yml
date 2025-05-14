@@ -37,6 +37,7 @@ services:
     volumes:
       - static_volume:/app/web/staticfiles:ro
       - media_volume:/app/web/media:ro
+      - discord-mods-inc_certs:/certs:ro
     ports:
       - "80:80"
       - "443:443"
@@ -92,3 +93,5 @@ volumes:
   static_volume:
   media_volume:
   redis_data:
+  discord-mods-inc_certs:
+    external: true

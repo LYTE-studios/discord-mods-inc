@@ -162,50 +162,59 @@ print_status "Stopping existing nginx service..."
 sudo systemctl stop nginx || true
 sudo systemctl disable nginx || true
 
-# Generate and validate environment file
-setup_env() {
-    if [ ! -f .env ]; then
-        print_status "Generating environment file..."
-        cat > .env << 'EOL'
-# Web Configuration
-DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
-DJANGO_DEBUG=False
-ALLOWED_HOSTS=gideon.lytestudios.be
-DOMAIN=gideon.lytestudios.be
-
-# Redis settings (required)
-REDIS_HOST=redis
-REDIS_PORT=6379
-
-# SSL settings
-SSL_EMAIL=admin@lytestudios.be
-
-# Security settings
-JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
-ENCRYPTION_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
-EOL
-        chmod 600 .env
-    fi
-
-    # Validate required environment variables
-    print_status "Validating environment variables..."
-    required_vars=("DJANGO_SECRET_KEY" "ALLOWED_HOSTS" "REDIS_HOST" "REDIS_PORT")
-    missing_vars=()
+# Function to install and configure certbot
+setup_ssl() {
+    print_status "Setting up SSL..."
     
-    while IFS= read -r line; do
-        if [[ $line =~ ^[^#]*= ]]; then
-            key=$(echo "$line" | cut -d'=' -f1)
-            value=$(echo "$line" | cut -d'=' -f2-)
-            if [[ " ${required_vars[@]} " =~ " ${key} " ]] && [[ -z "$value" ]]; then
-                missing_vars+=("$key")
-            fi
-        fi
-    done < .env
-
-    if [ ${#missing_vars[@]} -ne 0 ]; then
-        print_error "Missing required environment variables: ${missing_vars[*]}"
-        exit 1
+    # Install certbot and nginx plugin
+    if ! command -v certbot &> /dev/null; then
+        print_status "Installing certbot..."
+        apt-get update
+        apt-get install -y certbot python3-certbot-nginx
     fi
+
+    # Ensure nginx is not running
+    docker compose stop nginx
+
+    # Get SSL certificate
+    if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+        print_status "Obtaining SSL certificate..."
+        certbot certonly --standalone \
+            --non-interactive \
+            --agree-tos \
+            --email "$SSL_EMAIL" \
+            --domains "$DOMAIN" \
+            --preferred-challenges http
+
+        if [ $? -ne 0 ]; then
+            print_error "Failed to obtain SSL certificate"
+            exit 1
+        fi
+    else
+        print_warning "SSL certificate already exists"
+    fi
+
+    # Create SSL directory in Docker volume
+    print_status "Setting up SSL certificates for nginx..."
+    docker volume create discord-mods-inc_certs
+
+    # Copy certificates to Docker volume
+    docker run --rm \
+        -v discord-mods-inc_certs:/certs \
+        -v /etc/letsencrypt:/etc/letsencrypt:ro \
+        alpine sh -c "mkdir -p /certs && cp -rL /etc/letsencrypt/live/$DOMAIN/* /certs/"
+
+    # Set up auto-renewal
+    print_status "Setting up auto-renewal..."
+    cat > /etc/cron.weekly/renew-cert << EOF
+#!/bin/bash
+certbot renew --quiet
+docker compose restart nginx
+EOF
+    chmod +x /etc/cron.weekly/renew-cert
+
+    # Start nginx
+    docker compose up -d nginx
 }
 
 # Create necessary directories
@@ -299,10 +308,11 @@ sudo cp .env "/var/www/$DOMAIN/"
 sudo chown -R "$USERNAME:$USERNAME" "/var/www/$DOMAIN"
 sudo chmod 755 "/var/www/$DOMAIN"
 
+# Set up SSL certificates
+setup_ssl
+
 print_status "Setup completed successfully!"
 print_warning "Please ensure you have:"
 print_warning "1. Updated the .env file with your credentials"
-print_warning "2. Set up DNS records for $DOMAIN pointing to this server"
-print_warning "3. Once DNS is propagated, run: sudo certbot --nginx -d $DOMAIN"
-print_warning "Your site is available at http://$DOMAIN"
-print_warning "After DNS propagation, run certbot to enable HTTPS"
+print_warning "2. Verified DNS records for $DOMAIN are pointing to this server"
+print_warning "Your site is available at https://$DOMAIN"

@@ -67,12 +67,30 @@ for i in $(seq 1 5); do
     sleep 5
 done
 
-# Collect static files
-echo "Collecting static files..."
-if ! python web/manage.py collectstatic --noinput; then
+# Install Django REST framework static files
+echo "Installing Django REST framework static files..."
+DJANGO_SETTINGS_MODULE=web.config.settings python -c "
+import django
+django.setup()
+from django.contrib.staticfiles.management.commands.collectstatic import Command as CollectStatic
+CollectStatic().handle(
+    interactive=False,
+    clear=True,
+    verbosity=1,
+    link=False,
+    dry_run=False,
+    ignore_patterns=['CVS', '.*', '*~'],
+    use_default_ignore_patterns=True,
+    post_process=True,
+)
+"
+if [ $? -ne 0 ]; then
     echo "Error: Failed to collect static files"
     exit 1
 fi
+
+# Ensure static files are readable
+chmod -R 755 /app/web/staticfiles
 
 # Create cache table
 echo "Creating cache table..."
