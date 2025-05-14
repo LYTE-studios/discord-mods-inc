@@ -122,9 +122,15 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'static'
+STATIC_ROOT = BASE_DIR / 'web' / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'web' / 'static',
+]
+
+# Ensure static files are handled properly in production
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 ]
 
 # Media files

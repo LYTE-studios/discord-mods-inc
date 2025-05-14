@@ -69,27 +69,15 @@ done
 
 # Install Django REST framework static files
 echo "Installing Django REST framework static files..."
-DJANGO_SETTINGS_MODULE=web.config.settings python -c "
-import django
-django.setup()
-from django.contrib.staticfiles.management.commands.collectstatic import Command as CollectStatic
-CollectStatic().handle(
-    interactive=False,
-    clear=True,
-    verbosity=1,
-    link=False,
-    dry_run=False,
-    ignore_patterns=['CVS', '.*', '*~'],
-    use_default_ignore_patterns=True,
-    post_process=True,
-)
-"
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to collect static files"
-    exit 1
-fi
 
-# Ensure static files are readable
+# First collect all static files
+python web/manage.py collectstatic --noinput --clear
+
+# Then explicitly copy DRF static files
+cp -r /usr/local/lib/python3.11/site-packages/rest_framework/static/rest_framework/* /app/web/staticfiles/rest_framework/
+
+# Ensure proper ownership and permissions
+chown -R web:web /app/web/staticfiles
 chmod -R 755 /app/web/staticfiles
 
 # Create cache table
@@ -101,5 +89,3 @@ fi
 
 echo "Starting Gunicorn..."
 exec "$@"
-
-# Note: Don't need the final exec "$@" as it's already handled by the previous exec

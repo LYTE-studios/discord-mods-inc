@@ -7,6 +7,7 @@ services:
     volumes:
       - static_volume:/app/web/staticfiles
       - media_volume:/app/web/media
+      - ./web/static:/app/web/static:ro
     env_file:
       - .env
     environment:
@@ -35,6 +36,7 @@ services:
     volumes:
       - static_volume:/app/web/staticfiles:ro
       - media_volume:/app/web/media:ro
+      - ./web/static:/app/web/static:ro
     ports:
       - "80:80"
       - "443:443"
