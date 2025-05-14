@@ -9,6 +9,37 @@ NC='\033[0m' # No Color
 # Domain name
 DOMAIN="gideon.lytestudios.be"
 PROJECT_DIR="/home/ubuntu/discord-mods-inc"
+USERNAME=$(whoami)
+
+# Cleanup function
+cleanup() {
+    if [ $? -ne 0 ]; then
+        print_error "An error occurred during setup"
+        print_status "Cleaning up..."
+        docker compose down --remove-orphans 2>/dev/null || true
+    fi
+}
+
+# Set up trap for cleanup
+trap cleanup EXIT
+
+# Check for required tools
+check_requirements() {
+    if ! command -v docker &> /dev/null; then
+        print_error "Docker is not installed. Please install Docker first."
+        exit 1
+    fi
+    
+    if ! command -v docker compose &> /dev/null; then
+        print_error "Docker Compose is not installed. Please install Docker Compose first."
+        exit 1
+    fi
+    
+    if ! command -v rsync &> /dev/null; then
+        print_error "rsync is not installed. Please install rsync first."
+        exit 1
+    fi
+}
 
 # Function to print status messages
 print_status() {
@@ -23,9 +54,14 @@ print_error() {
     echo -e "${RED}[-] $1${NC}"
 }
 
+# Set up error handling
+set -e
+
 # Create project directory if it doesn't exist
 if [ ! -d "$PROJECT_DIR" ]; then
-    mkdir -p "$PROJECT_DIR"
+    print_status "Creating project directory..."
+    sudo mkdir -p "$PROJECT_DIR"
+    sudo chown -R "$USERNAME:$USERNAME" "$PROJECT_DIR"
 fi
 
 # Stop existing nginx service
@@ -69,26 +105,33 @@ fi
 
 # Create necessary directories
 print_status "Creating project directories..."
-sudo mkdir -p "/var/www/$DOMAIN"/{static,media,logs}
-sudo chown -R "$USERNAME:$USERNAME" "/var/www/$DOMAIN"
+if [ ! -d "/var/www/$DOMAIN" ]; then
+    sudo mkdir -p "/var/www/$DOMAIN"/{static,media,logs}
+    sudo chown -R "$USERNAME:$USERNAME" "/var/www/$DOMAIN"
+else
+    print_warning "Directory /var/www/$DOMAIN already exists, skipping creation"
+fi
 
 # Set up Django project structure
 print_status "Setting up Django project structure..."
+# First ensure core directory exists
+if [ ! -d "web/core" ]; then
+    print_error "web/core directory not found! This is required for the project."
+    exit 1
+fi
+
+# Create other required directories
 mkdir -p web/{config,chat,users,templates,static}
 mkdir -p web/templates/{chat,users}
 mkdir -p web/static/{css,js}
 
-# Copy existing modules to Django project
-cp -r ai web/ai
-cp -r cogs web/cogs
-cp -r monitoring web/monitoring
-cp -r security web/security
-cp -r tickets web/tickets
-cp -r utils web/utils
-cp -r workflow web/workflow
+# Core modules check already done above
 
 # Copy requirements.txt
 cp requirements.txt web/
+
+# Check requirements before Docker operations
+check_requirements
 
 # Stop and remove any existing containers
 print_status "Cleaning up existing containers..."
@@ -104,9 +147,10 @@ sleep 10
 
 # Copy project files
 print_status "Copying project files..."
-sudo cp -r web/* "/var/www/$DOMAIN/"
+sudo rsync -av --delete web/ "/var/www/$DOMAIN/"
 sudo cp .env "/var/www/$DOMAIN/"
 sudo chown -R "$USERNAME:$USERNAME" "/var/www/$DOMAIN"
+sudo chmod 755 "/var/www/$DOMAIN"
 
 print_status "Setup completed successfully!"
 print_warning "Please ensure you have:"
