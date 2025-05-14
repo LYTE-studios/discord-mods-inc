@@ -356,23 +356,31 @@
 </script>
 <script src="/static/js/chat.js"></script>
 <style>
-    .message-loading .message-content {
+    .message-typing .message-content {
         min-height: 24px;
+        padding: 8px;
     }
 
     .typing-indicator {
         display: flex;
         gap: 4px;
         padding: 4px 0;
+        align-items: center;
+        height: 24px;
     }
 
     .typing-indicator span {
-        width: 8px;
-        height: 8px;
-        background-color: #64748b;
+        width: 6px;
+        height: 6px;
+        background-color: #5865f2;
         border-radius: 50%;
         animation: typing 1s infinite;
         opacity: 0.3;
+        display: inline-block;
+    }
+
+    .message-ai .typing-indicator span {
+        background-color: #64748b;
     }
 
     .typing-indicator span:nth-child(2) {
@@ -404,6 +412,22 @@
         border-radius: 0.5rem;
         margin: 1rem 0;
         text-align: center;
+        font-size: 0.875rem;
+    }
+
+    /* Disabled state styles */
+    .input-wrapper:has(textarea:disabled) {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    textarea:disabled {
+        cursor: not-allowed;
+        background-color: #f3f4f6;
+    }
+
+    .btn-send:disabled {
+        cursor: not-allowed;
     }
 </style>
 {% endblock %}

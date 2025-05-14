@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageText');
     const messagesContainer = document.querySelector('.messages-container');
+    let isProcessing = false;
 
     // Auto-resize textarea as user types
     messageInput.addEventListener('input', function() {
@@ -14,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
     messageInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            if (this.value.trim()) {
+            if (this.value.trim() && !isProcessing) {
                 handleSubmit();
             }
         }
@@ -30,22 +31,38 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle form submission
     messageForm.addEventListener('submit', function(e) {
         e.preventDefault(); // Prevent form from submitting normally
-        handleSubmit();
+        if (!isProcessing) {
+            handleSubmit();
+        }
         return false; // Extra prevention of form submission
     });
+
+    function setProcessingState(processing) {
+        isProcessing = processing;
+        messageInput.disabled = processing;
+        messageInput.placeholder = processing ? 'Waiting for response...' : `Message ${current_chat_type.toUpperCase()}... (Press Enter to send)`;
+        const sendButton = messageForm.querySelector('.btn-send');
+        if (sendButton) {
+            sendButton.disabled = processing;
+            sendButton.style.opacity = processing ? '0.5' : '1';
+        }
+    }
 
     async function handleSubmit() {
         const messageContent = messageInput.value.trim();
         if (!messageContent) return;
+
+        // Set processing state
+        setProcessingState(true);
 
         // Add user message immediately
         const userMessage = createMessageElement(messageContent, false);
         messagesContainer.appendChild(userMessage);
         scrollToBottom();
 
-        // Add loading message
-        const loadingMessage = createLoadingMessage();
-        messagesContainer.appendChild(loadingMessage);
+        // Add typing indicator
+        const typingIndicator = createTypingIndicator();
+        messagesContainer.appendChild(typingIndicator);
         scrollToBottom();
 
         // Clear input
@@ -71,8 +88,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const data = await response.json();
             
-            // Remove loading message
-            loadingMessage.remove();
+            // Remove typing indicator
+            typingIndicator.remove();
 
             // Add AI response
             if (data.status === 'success' && data.message) {
@@ -84,11 +101,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error('Error:', error);
-            loadingMessage.remove();
+            typingIndicator.remove();
             // Show error message
             const errorMessage = createErrorMessage(error.message);
             messagesContainer.appendChild(errorMessage);
             scrollToBottom();
+        } finally {
+            // Reset processing state
+            setProcessingState(false);
         }
     }
 
@@ -96,9 +116,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function createMessageElement(content, isAi) {
         const div = document.createElement('div');
         div.className = `message ${isAi ? 'message-ai' : 'message-user'}`;
+        const author = isAi ? 
+            (current_chat_type === 'cto' ? 'CTO' : 'Developer') : 
+            'You';
         div.innerHTML = `
             <div class="message-header">
-                <span class="message-author">${isAi ? (current_chat_type === 'cto' ? 'CTO' : 'Developer') : 'You'}</span>
+                <span class="message-author">${author}</span>
                 <span class="message-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
             <div class="message-content">${content}</div>
@@ -106,14 +129,15 @@ document.addEventListener('DOMContentLoaded', function() {
         return div;
     }
 
-    // Create loading message element
-    function createLoadingMessage() {
+    // Create typing indicator
+    function createTypingIndicator() {
         const div = document.createElement('div');
-        div.className = 'message message-ai message-loading';
+        div.className = 'message message-ai message-typing';
+        const author = current_chat_type === 'cto' ? 'CTO' : 'Developer';
         div.innerHTML = `
             <div class="message-header">
-                <span class="message-author">${current_chat_type === 'cto' ? 'CTO' : 'Developer'}</span>
-                <span class="message-time">...</span>
+                <span class="message-author">${author}</span>
+                <span class="message-time">typing...</span>
             </div>
             <div class="message-content">
                 <div class="typing-indicator">
