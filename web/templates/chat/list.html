@@ -42,33 +42,49 @@
             <h2>{% if current_chat_type == 'cto' %}CTO Chat{% else %}Developer Chat{% endif %}</h2>
         </div>
 
-        <div class="conversations-list">
+        <!-- Message History -->
+        <div class="messages-container">
             {% if conversations %}
             {% for conversation in conversations %}
-            <div class="conversation-card">
-                <a href="{% url 'chat:chat_room' conversation.id %}" class="conversation-link">
-                    <div class="conversation-title">{{ conversation.title }}</div>
-                    <div class="conversation-meta">
-                        <span class="conversation-date">{{ conversation.updated_at|date:"M d, Y" }}</span>
-                        <span class="conversation-time">{{ conversation.updated_at|time:"H:i" }}</span>
-                    </div>
+            <div class="message {% if conversation.user == request.user %}message-user{% else %}message-ai{% endif %}">
+                <div class="message-header">
+                    <span class="message-author">{% if conversation.user == request.user %}You{% else %}{{
+                        conversation.get_role_display }}{% endif %}</span>
+                    <span class="message-time">{{ conversation.updated_at|date:"H:i" }}</span>
+                </div>
+                <div class="message-content">
                     {% with last_message=conversation.messages.last %}
                     {% if last_message %}
-                    <div class="conversation-preview">
-                        <span class="preview-author">{{ last_message.get_role_display }}:</span>
-                        {{ last_message.content|truncatechars:100 }}
-                    </div>
+                    {{ last_message.content }}
                     {% endif %}
                     {% endwith %}
-                </a>
+                </div>
             </div>
             {% endfor %}
             {% else %}
-            <div class="no-conversations">
-                <p>No conversations yet.</p>
-                <p>Start chatting to see your history here.</p>
+            <div class="no-messages">
+                <p>No messages yet.</p>
+                <p>Start a conversation below!</p>
             </div>
             {% endif %}
+        </div>
+
+        <!-- Message Input -->
+        <div class="message-input">
+            <form id="messageForm" class="input-form" method="POST" action="{% url 'chat:chat_room' %}">
+                {% csrf_token %}
+                <div class="input-wrapper">
+                    <textarea id="messageText" name="message" placeholder="Message {{ current_chat_type|upper }}..."
+                        rows="1"></textarea>
+                    <button type="submit" class="btn-send">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </form>
         </div>
     </main>
 </div>
@@ -175,69 +191,112 @@
         color: #1f2937;
     }
 
-    .conversations-list {
+    .messages-container {
         flex: 1;
         padding: 1rem;
         overflow-y: auto;
+        display: flex;
+        flex-direction: column;
     }
 
-    .conversation-card {
-        background: white;
-        border-radius: 0.5rem;
+    .message {
         margin-bottom: 1rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        transition: transform 0.2s;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        max-width: 80%;
     }
 
-    .conversation-card:hover {
-        transform: translateY(-2px);
+    .message-user {
+        background-color: #f3f4f6;
+        align-self: flex-end;
     }
 
-    .conversation-link {
-        display: block;
-        padding: 1rem;
-        color: inherit;
-        text-decoration: none;
+    .message-ai {
+        background-color: #f0f9ff;
+        align-self: flex-start;
     }
 
-    .conversation-title {
-        font-weight: bold;
-        font-size: 1.1rem;
+    .message-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         margin-bottom: 0.5rem;
     }
 
-    .conversation-meta {
+    .message-author {
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .message-time {
         font-size: 0.875rem;
         color: #64748b;
-        margin-bottom: 0.5rem;
     }
 
-    .conversation-preview {
-        font-size: 0.875rem;
-        color: #64748b;
+    .message-content {
+        line-height: 1.5;
+        color: #1f2937;
+        word-wrap: break-word;
     }
 
-    .preview-author {
-        font-weight: 500;
-        color: var(--primary-color);
-    }
-
-    .no-conversations {
+    .no-messages {
         text-align: center;
         padding: 3rem;
-        background: white;
-        border-radius: 0.5rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        color: #64748b;
     }
 
-    .no-conversations p:first-child {
+    .no-messages p:first-child {
         font-size: 1.25rem;
         font-weight: bold;
         margin-bottom: 0.5rem;
+        color: #1f2937;
     }
 
-    .no-conversations p:last-child {
-        color: #64748b;
+    .message-input {
+        padding: 1rem;
+        background-color: #ffffff;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .input-wrapper {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.5rem;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    #messageText {
+        flex: 1;
+        border: none;
+        background: transparent;
+        resize: none;
+        padding: 0.5rem;
+        min-height: 20px;
+        max-height: 120px;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        outline: none;
+    }
+
+    .btn-send {
+        background: none;
+        border: none;
+        padding: 0.5rem;
+        cursor: pointer;
+        color: var(--primary-color);
+        transition: color 0.2s;
+    }
+
+    .btn-send:hover {
+        color: var(--secondary-color);
+    }
+
+    .btn-send svg {
+        width: 20px;
+        height: 20px;
     }
 </style>
 

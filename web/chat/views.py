@@ -11,7 +11,7 @@ from .serializers import ConversationSerializer, MessageSerializer
 
 class ChatListView(LoginRequiredMixin, TemplateView):
     """
-    View for displaying the chat list page.
+    View for displaying the chat list page and handling new messages.
     """
     template_name = 'chat/list.html'
 
@@ -21,10 +21,35 @@ class ChatListView(LoginRequiredMixin, TemplateView):
         context['conversations'] = Conversation.objects.filter(
             user=self.request.user,
             chat_type=chat_type
-        )
+        ).order_by('-updated_at')
         context['current_chat_type'] = chat_type
         context['chat_types'] = Conversation.CHAT_TYPES
         return context
+
+    def post(self, request, *args, **kwargs):
+        """Handle new message creation"""
+        chat_type = request.GET.get('type', 'cto')
+        message_content = request.POST.get('message')
+
+        if message_content:
+            # Create a new conversation if none exists
+            conversation = Conversation.objects.create(
+                user=request.user,
+                chat_type=chat_type,
+                title=f"Chat with {chat_type.upper()}"
+            )
+
+            # Create the message
+            Message.objects.create(
+                conversation=conversation,
+                user=request.user,
+                content=message_content,
+                is_ai=False
+            )
+
+            return redirect('chat:chat_room', pk=conversation.id)
+
+        return redirect('chat:list')
 
 class ChatRoomView(LoginRequiredMixin, TemplateView):
     """
