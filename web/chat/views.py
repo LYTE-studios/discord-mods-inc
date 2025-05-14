@@ -57,10 +57,10 @@ class ChatListView(LoginRequiredMixin, View):
                 chat_type
             )
 
-            # Create the AI message
+            # Create the AI message with the same user (for DB constraint)
             Message.objects.create(
                 conversation=conversation,
-                user=None,
+                user=request.user,  # Use the same user for AI messages
                 content=ai_response,
                 is_ai=True
             )
