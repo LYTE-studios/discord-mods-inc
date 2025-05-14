@@ -10,9 +10,10 @@ from datetime import datetime
 import logging
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
+from django.contrib.auth import get_user_model
 
 logger = logging.getLogger(__name__)
-
+User = get_user_model()
 
 class ChatListView(LoginRequiredMixin, View):
     """
@@ -48,6 +49,13 @@ class ChatListView(LoginRequiredMixin, View):
             return redirect('chat:list')
 
         try:
+            # Get or create the AI user based on chat type
+            ai_username = f'ai_{chat_type}'
+            ai_user, _ = User.objects.get_or_create(
+                username=ai_username,
+                defaults={'email': f'{ai_username}@example.com'}
+            )
+
             # Create a new conversation
             conversation = Conversation.objects.create(
                 user=request.user,
@@ -56,7 +64,7 @@ class ChatListView(LoginRequiredMixin, View):
             )
 
             # Create user message
-            Message.objects.create(
+            user_message = Message.objects.create(
                 conversation=conversation,
                 user=request.user,
                 content=message_content,
@@ -71,10 +79,10 @@ class ChatListView(LoginRequiredMixin, View):
                 chat_type
             )
 
-            # Create AI message
+            # Create AI message with the AI user
             ai_message = Message.objects.create(
                 conversation=conversation,
-                user=request.user,  # Use same user for DB constraint
+                user=ai_user,  # Use AI user instead of request.user
                 content=ai_response,
                 is_ai=True,
                 created_at=timezone.now()
@@ -128,13 +136,6 @@ class ChatRoomView(LoginRequiredMixin, TemplateView):
             # New conversation
             context['conversation'] = None
             context['messages'] = []
-            
-        # Add WebSocket URL for chat
-        ws_protocol = 'wss' if self.request.is_secure() else 'ws'
-        ws_host = self.request.get_host()
-        context['websocket_url'] = f"{ws_protocol}://{ws_host}/ws/chat/"
-        if pk:
-            context['websocket_url'] += f"{pk}/"
             
         return context
 

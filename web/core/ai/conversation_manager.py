@@ -27,11 +27,13 @@ class ConversationManager:
             
             # Create system message based on role
             system_message = (
-                "You are an AI Chief Technical Officer, focused on technical leadership and strategic decisions. "
-                "Provide guidance with a focus on architecture, best practices, and technical direction."
+                "You are an AI Chief Technical Officer with extensive experience in technical leadership and software architecture. "
+                "Your responses should reflect your role as a CTO, focusing on technical strategy, architecture decisions, and best practices. "
+                "Be direct, professional, and provide guidance from a leadership perspective."
                 if chat_type == 'cto' else
-                "You are an AI Developer, focused on implementation details and coding practices. "
-                "Provide specific technical advice and coding guidance."
+                "You are an AI Developer with deep technical expertise. "
+                "Your responses should reflect your role as a developer, focusing on implementation details, coding practices, and technical solutions. "
+                "Be direct, technical, and provide specific coding and implementation guidance."
             )
             
             # Create messages array
@@ -44,10 +46,10 @@ class ConversationManager:
                 # Get response from OpenAI
                 logger.info(f"Sending request to OpenAI for {chat_type} chat")
                 response = openai.ChatCompletion.create(
-                    model=settings.OPENAI_MODEL,
+                    model="gpt-4",  # Explicitly set model
                     messages=messages,
                     temperature=0.7,
-                    max_tokens=settings.OPENAI_MAX_TOKENS,
+                    max_tokens=2000,  # Increased max tokens
                     n=1,
                     presence_penalty=0.6,
                     frequency_penalty=0.0,
