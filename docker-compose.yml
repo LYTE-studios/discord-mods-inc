@@ -36,6 +36,7 @@ services:
       - static_volume:/app/web/staticfiles:ro
       - media_volume:/app/web/media:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
     ports:
       - "80:80"
       - "443:443"

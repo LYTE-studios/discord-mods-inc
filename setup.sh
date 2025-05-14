@@ -166,34 +166,45 @@ sudo systemctl disable nginx || true
 setup_ssl() {
     print_status "Setting up SSL..."
     
-    # Install certbot and nginx plugin
+    # Create webroot directory
+    mkdir -p /var/www/certbot
+    
+    # Install certbot
     if ! command -v certbot &> /dev/null; then
         print_status "Installing certbot..."
         apt-get update
-        apt-get install -y certbot python3-certbot-nginx
+        apt-get install -y certbot
     fi
 
-    # Start nginx temporarily for certbot
+    # Start nginx with webroot configuration
     docker compose up -d nginx
 
     # Wait for nginx to be ready
     print_status "Waiting for nginx to start..."
     sleep 5
 
-    # Get SSL certificate
+    # Get SSL certificate using webroot plugin
     if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
         print_status "Obtaining SSL certificate..."
-        certbot --nginx \
+        certbot certonly \
+            --webroot \
+            --webroot-path /var/www/certbot \
             --non-interactive \
             --agree-tos \
-            -m "${SSL_EMAIL}" \
-            -d "${DOMAIN}" \
-            --redirect
+            --email "${SSL_EMAIL}" \
+            --domains "${DOMAIN}" \
+            --rsa-key-size 4096
 
         if [ $? -ne 0 ]; then
             print_error "Failed to obtain SSL certificate"
             docker compose stop nginx
             exit 1
+        fi
+
+        # Update nginx configuration for SSL
+        if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+            print_status "Configuring nginx for SSL..."
+            docker compose restart nginx
         fi
     else
         print_warning "SSL certificate already exists"
