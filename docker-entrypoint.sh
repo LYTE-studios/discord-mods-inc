@@ -6,58 +6,61 @@ set -e
 # Handle signals
 trap 'kill -TERM $PID' TERM INT
 
+# Check required environment variables
+required_vars=("REDIS_HOST" "REDIS_PORT" "DJANGO_SECRET_KEY" "ALLOWED_HOSTS")
+for var in "${required_vars[@]}"; do
+    if [ -z "${!var}" ]; then
+        echo "Error: Required environment variable $var is not set"
+        exit 1
+    fi
+done
+
 # Function to wait for Redis
 wait_for_redis() {
     echo "Waiting for Redis..."
-    until timeout 1 bash -c "cat < /dev/null > /dev/tcp/${REDIS_HOST}/${REDIS_PORT}" 2>/dev/null
-    do
-        echo "Redis is unavailable - sleeping"
+    for i in $(seq 1 30); do
+        if nc -z "${REDIS_HOST}" "${REDIS_PORT}"; then
+            echo "Redis is up"
+            return 0
+        fi
+        echo "Redis is unavailable - retry $i/30"
         sleep 1
     done
-    echo "Redis is up"
+    echo "Error: Redis did not become available in time"
+    exit 1
 }
 
-# Function to create health check endpoint
-setup_health_check() {
-    mkdir -p /app/web/health
-    cat > /app/web/health/views.py << 'EOF'
-from django.http import HttpResponse
+echo "Running startup checks..."
 
-def health_check(request):
-    return HttpResponse("OK")
-EOF
-
-    cat > /app/web/health/urls.py << 'EOF'
-from django.urls import path
-from . import views
-
-urlpatterns = [
-    path('', views.health_check, name='health_check'),
-]
-EOF
-
-    # Add health URLs to main URLs
-    if ! grep -q "health/" /app/web/config/urls.py; then
-        sed -i '/urlpatterns = \[/a \    path("health/", include("web.health.urls")),' /app/web/config/urls.py
-        sed -i '1i from django.urls import include' /app/web/config/urls.py
-    fi
-}
-
-# Wait for Redis to be ready
+# Wait for Redis
 wait_for_redis
 
-# Setup health check endpoint
-setup_health_check
+# Create necessary directories
+mkdir -p /app/web/{staticfiles,media}
 
-# Run migrations and collect static files
-python manage.py migrate --noinput
+# Run database migrations with retry
+echo "Running database migrations..."
+for i in $(seq 1 5); do
+    if python manage.py migrate --noinput; then
+        break
+    fi
+    if [ $i -eq 5 ]; then
+        echo "Error: Database migrations failed after 5 attempts"
+        exit 1
+    fi
+    echo "Migration attempt $i failed, retrying..."
+    sleep 5
+done
+
+# Collect static files
+echo "Collecting static files..."
 python manage.py collectstatic --noinput
+
+# Create cache table
+echo "Creating cache table..."
 python manage.py createcachetable
 
-# Start the main process
-echo "Starting process: $@"
-exec "$@" &
-PID=$!
-wait $PID
+echo "Starting Gunicorn..."
+exec "$@"
 
 # Note: Don't need the final exec "$@" as it's already handled by the previous exec

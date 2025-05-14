@@ -76,6 +76,9 @@ set -e
 print_status "Checking system requirements..."
 check_requirements
 
+# Setup and validate environment
+setup_env
+
 # Create project directory if it doesn't exist
 if [ ! -d "$PROJECT_DIR" ]; then
     print_status "Creating project directory..."
@@ -88,39 +91,51 @@ print_status "Stopping existing nginx service..."
 sudo systemctl stop nginx || true
 sudo systemctl disable nginx || true
 
-# Generate environment file if it doesn't exist
-if [ ! -f .env ]; then
-    print_status "Generating environment file..."
-    cat > .env << 'EOL'
+# Generate and validate environment file
+setup_env() {
+    if [ ! -f .env ]; then
+        print_status "Generating environment file..."
+        cat > .env << 'EOL'
 # Web Configuration
 DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
 DJANGO_DEBUG=False
 ALLOWED_HOSTS=gideon.lytestudios.be
 DOMAIN=gideon.lytestudios.be
 
-# Database settings
-POSTGRES_DB=postgres
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres_password_123
-POSTGRES_HOST=db
-POSTGRES_PORT=5432
-
-# Redis settings
+# Redis settings (required)
 REDIS_HOST=redis
 REDIS_PORT=6379
 
 # SSL settings
 SSL_EMAIL=admin@lytestudios.be
 
-# Other settings
-OPENAI_API_KEY=your_openai_key
-GITHUB_TOKEN=your_github_token
+# Security settings
 JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
-ENCRYPTION_KEY=your_encryption_key
+ENCRYPTION_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
 EOL
+        chmod 600 .env
+    fi
 
-    chmod 600 .env
-fi
+    # Validate required environment variables
+    print_status "Validating environment variables..."
+    required_vars=("DJANGO_SECRET_KEY" "ALLOWED_HOSTS" "REDIS_HOST" "REDIS_PORT")
+    missing_vars=()
+    
+    while IFS= read -r line; do
+        if [[ $line =~ ^[^#]*= ]]; then
+            key=$(echo "$line" | cut -d'=' -f1)
+            value=$(echo "$line" | cut -d'=' -f2-)
+            if [[ " ${required_vars[@]} " =~ " ${key} " ]] && [[ -z "$value" ]]; then
+                missing_vars+=("$key")
+            fi
+        fi
+    done < .env
+
+    if [ ${#missing_vars[@]} -ne 0 ]; then
+        print_error "Missing required environment variables: ${missing_vars[*]}"
+        exit 1
+    fi
+}
 
 # Create necessary directories
 print_status "Creating project directories..."
@@ -167,13 +182,40 @@ docker volume rm discord-mods-inc_static_volume discord-mods-inc_media_volume ||
 docker volume create discord-mods-inc_static_volume
 docker volume create discord-mods-inc_media_volume
 
-# Ensure Docker user has correct permissions
-print_status "Setting up Docker user permissions..."
-docker run --rm -v "$(pwd):/app" python:3.11-slim-bullseye chown -R 999:999 /app/web/static /app/web/staticfiles /app/web/media
-
 # Build and start Docker containers
-print_status "Starting Docker containers..."
-docker compose up -d --build
+print_status "Building and starting containers..."
+if ! docker compose up -d --build; then
+    print_error "Failed to start containers"
+    docker compose logs
+    exit 1
+fi
+
+# Monitor container startup
+print_status "Monitoring container startup..."
+attempt=1
+max_attempts=30
+while [ $attempt -le $max_attempts ]; do
+    if docker compose ps | grep -q "unhealthy\|exit"; then
+        print_error "Container health check failed"
+        docker compose logs
+        exit 1
+    fi
+    
+    if docker compose ps | grep -q "running\|healthy"; then
+        print_status "All containers are running"
+        break
+    fi
+    
+    echo "Waiting for containers to be ready... ($attempt/$max_attempts)"
+    sleep 2
+    attempt=$((attempt + 1))
+done
+
+if [ $attempt -gt $max_attempts ]; then
+    print_error "Containers failed to start in time"
+    docker compose logs
+    exit 1
+fi
 
 # Wait for web container to be ready
 print_status "Waiting for web container to be ready..."

@@ -32,6 +32,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libpq5 \
         gosu \
+        netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user
@@ -64,5 +65,14 @@ EXPOSE 8000
 # Set the entrypoint
 ENTRYPOINT ["docker-entrypoint.sh"]
 
-# Default command (2 workers is usually enough for most cases)
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120", "web.config.wsgi:application"]
+# Default command with optimized settings
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", \
+     "--workers", "2", \
+     "--threads", "4", \
+     "--worker-class", "gthread", \
+     "--worker-tmp-dir", "/dev/shm", \
+     "--timeout", "120", \
+     "--keepalive", "32", \
+     "--max-requests", "1000", \
+     "--max-requests-jitter", "50", \
+     "web.config.wsgi:application"]
