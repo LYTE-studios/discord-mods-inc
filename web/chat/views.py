@@ -1,10 +1,9 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
-from django.views.generic import TemplateView
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.generic import TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import get_object_or_404
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 
@@ -15,16 +14,19 @@ class ChatListView(LoginRequiredMixin, View):
     """
     template_name = 'chat/list.html'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        chat_type = self.request.GET.get('type', 'cto')  # Default to CTO chat
-        context['conversations'] = Conversation.objects.filter(
-            user=self.request.user,
+    def get(self, request, *args, **kwargs):
+        chat_type = request.GET.get('type', 'cto')
+        conversations = Conversation.objects.filter(
+            user=request.user,
             chat_type=chat_type
         ).order_by('-updated_at')
-        context['current_chat_type'] = chat_type
-        context['chat_types'] = Conversation.CHAT_TYPES
-        return context
+        
+        context = {
+            'conversations': conversations,
+            'current_chat_type': chat_type,
+            'chat_types': Conversation.CHAT_TYPES
+        }
+        return render(request, self.template_name, context)
 
     def post(self, request, *args, **kwargs):
         """Handle new message creation"""
@@ -32,7 +34,7 @@ class ChatListView(LoginRequiredMixin, View):
         message_content = request.POST.get('message')
 
         if message_content:
-            # Create a new conversation if none exists
+            # Create a new conversation
             conversation = Conversation.objects.create(
                 user=request.user,
                 chat_type=chat_type,
@@ -47,9 +49,12 @@ class ChatListView(LoginRequiredMixin, View):
                 is_ai=False
             )
 
+            # Redirect to the new conversation
             return redirect('chat:chat_room', pk=conversation.id)
 
-        return redirect('chat:list')
+        # If no message content, redirect back to the chat list
+        return redirect(f'/?type={chat_type}')
+
 
 class ChatRoomView(LoginRequiredMixin, TemplateView):
     """
@@ -63,7 +68,7 @@ class ChatRoomView(LoginRequiredMixin, TemplateView):
         pk = self.kwargs.get('pk')
         
         if pk:
-            # Existing CTO conversation
+            # Existing conversation
             conversation = get_object_or_404(
                 Conversation,
                 pk=pk,
@@ -85,6 +90,7 @@ class ChatRoomView(LoginRequiredMixin, TemplateView):
             
         return context
 
+
 class ConversationViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing conversations.
@@ -94,18 +100,15 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Get CTO conversations for the current user.
+        Get conversations for the current user.
         """
-        return Conversation.objects.filter(
-            user=self.request.user,
-            is_cto_chat=True
-        )
+        return Conversation.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         """
-        Create a new CTO conversation for the current user.
+        Create a new conversation for the current user.
         """
-        serializer.save(user=self.request.user, is_cto_chat=True)
+        serializer.save(user=self.request.user)
 
     @action(detail=True, methods=['post'])
     def send_message(self, request, pk=None):
