@@ -8,9 +8,31 @@ RUN rm /etc/nginx/conf.d/default.conf && \
     sed -i '/user  nginx;/d' /etc/nginx/nginx.conf
 
 # Create necessary directories with proper permissions
-RUN mkdir -p /var/log/nginx /app/web/staticfiles /app/web/media && \
-    chown -R nginx:nginx /var/log/nginx /app && \
-    chmod -R 755 /app/web/staticfiles /app/web/media
+RUN mkdir -p /var/log/nginx \
+            /app/web/staticfiles \
+            /app/web/media \
+            /var/cache/nginx \
+            /var/cache/nginx/client_temp \
+            /var/cache/nginx/proxy_temp \
+            /var/cache/nginx/fastcgi_temp \
+            /var/cache/nginx/uwsgi_temp \
+            /var/cache/nginx/scgi_temp && \
+    chown -R nginx:nginx /var/log/nginx \
+                        /app \
+                        /var/cache/nginx \
+                        /var/cache/nginx/client_temp \
+                        /var/cache/nginx/proxy_temp \
+                        /var/cache/nginx/fastcgi_temp \
+                        /var/cache/nginx/uwsgi_temp \
+                        /var/cache/nginx/scgi_temp && \
+    chmod -R 755 /app/web/staticfiles \
+                 /app/web/media \
+                 /var/cache/nginx \
+                 /var/cache/nginx/client_temp \
+                 /var/cache/nginx/proxy_temp \
+                 /var/cache/nginx/fastcgi_temp \
+                 /var/cache/nginx/uwsgi_temp \
+                 /var/cache/nginx/scgi_temp
 
 # Copy custom nginx config
 COPY --chown=nginx:nginx default.conf /etc/nginx/conf.d/
@@ -24,8 +46,3 @@ EXPOSE 80 443
 
 # Switch to non-root user
 USER nginx
-
-# Set permissions for nginx to write to /tmp
-RUN mkdir -p /tmp/nginx && \
-    chown -R nginx:nginx /tmp/nginx && \
-    chmod -R 755 /tmp/nginx
