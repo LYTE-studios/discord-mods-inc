@@ -17,10 +17,13 @@ class ChatListView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        chat_type = self.request.GET.get('type', 'cto')  # Default to CTO chat
         context['conversations'] = Conversation.objects.filter(
             user=self.request.user,
-            is_cto_chat=True
+            chat_type=chat_type
         )
+        context['current_chat_type'] = chat_type
+        context['chat_types'] = Conversation.CHAT_TYPES
         return context
 
 class ChatRoomView(LoginRequiredMixin, TemplateView):
@@ -39,8 +42,7 @@ class ChatRoomView(LoginRequiredMixin, TemplateView):
             conversation = get_object_or_404(
                 Conversation,
                 pk=pk,
-                user=self.request.user,
-                is_cto_chat=True
+                user=self.request.user
             )
             context['conversation'] = conversation
             context['messages'] = conversation.messages.all().order_by('created_at')

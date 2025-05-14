@@ -2,29 +2,27 @@
 
 {% block content %}
 <div class="chat-container">
-    <!-- AI Team Status Sidebar -->
+    <!-- Chat Header -->
+    <div class="chat-header">
+        <a href="/" class="back-button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Back
+        </a>
+        <h1>{% if conversation.chat_type == 'cto' %}CTO Chat{% else %}Developer Chat{% endif %}</h1>
+    </div>
+
+    <!-- AI Team Member Status -->
     <aside class="team-status">
-        <h2>AI Team Members</h2>
+        <h2>Team Member</h2>
         <div class="team-members">
-            <div class="team-member" data-role="cto">
+            <div class="team-member" data-role="{{ conversation.chat_type }}">
                 <span class="status-dot"></span>
-                <span class="member-name">CTO</span>
-            </div>
-            <div class="team-member" data-role="ux">
-                <span class="status-dot"></span>
-                <span class="member-name">UX Designer</span>
-            </div>
-            <div class="team-member" data-role="ui">
-                <span class="status-dot"></span>
-                <span class="member-name">UI Designer</span>
-            </div>
-            <div class="team-member" data-role="dev">
-                <span class="status-dot"></span>
-                <span class="member-name">Developer</span>
-            </div>
-            <div class="team-member" data-role="tester">
-                <span class="status-dot"></span>
-                <span class="member-name">Tester</span>
+                <span class="member-name">{% if conversation.chat_type == 'cto' %}CTO{% else %}Developer{% endif
+                    %}</span>
             </div>
         </div>
     </aside>
@@ -56,8 +54,17 @@
         <div class="message-input">
             <form id="messageForm" class="input-form">
                 {% csrf_token %}
-                <textarea id="messageText" name="message" placeholder="Type your message here..." rows="3"></textarea>
-                <button type="submit" class="btn-send">Send</button>
+                <div class="input-wrapper">
+                    <textarea id="messageText" name="message" placeholder="Type your message here..."
+                        rows="1"></textarea>
+                    <button type="submit" class="btn-send">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
             </form>
         </div>
     </div>
@@ -82,6 +89,75 @@
         </div>
     </aside>
 </div>
+
+<style>
+    .chat-header {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+        background-color: white;
+    }
+
+    .back-button {
+        display: flex;
+        align-items: center;
+        color: var(--primary-color);
+        text-decoration: none;
+        margin-right: 1rem;
+    }
+
+    .back-button svg {
+        margin-right: 0.5rem;
+    }
+
+    .chat-header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #1f2937;
+    }
+
+    .input-wrapper {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.5rem;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    #messageText {
+        flex: 1;
+        border: none;
+        resize: none;
+        padding: 0.5rem;
+        min-height: 40px;
+        max-height: 120px;
+        font-size: 1rem;
+        line-height: 1.5;
+        outline: none;
+    }
+
+    .btn-send {
+        background: none;
+        border: none;
+        padding: 0.5rem;
+        cursor: pointer;
+        color: var(--primary-color);
+        transition: color 0.2s;
+    }
+
+    .btn-send:hover {
+        color: var(--secondary-color);
+    }
+
+    .message-input {
+        padding: 1rem;
+        background: white;
+        border-top: 1px solid #e5e7eb;
+    }
+</style>
 {% endblock %}
 
 {% block extra_scripts %}

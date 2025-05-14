@@ -5,6 +5,11 @@ class Conversation(models.Model):
     """
     Model representing a conversation.
     """
+    CHAT_TYPES = (
+        ('cto', 'CTO Chat'),
+        ('dev', 'Developer Chat'),
+    )
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -13,7 +18,7 @@ class Conversation(models.Model):
     title = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    is_cto_chat = models.BooleanField(default=False)
+    chat_type = models.CharField(max_length=10, choices=CHAT_TYPES, default='cto')
 
     class Meta:
         ordering = ['-updated_at']
