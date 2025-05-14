@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             if (this.value.trim()) {
-                messageForm.dispatchEvent(new Event('submit'));
+                handleSubmit();
             }
         }
     });
@@ -28,8 +28,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Handle form submission
-    messageForm.addEventListener('submit', async function(e) {
+    messageForm.addEventListener('submit', function(e) {
         e.preventDefault();
+        handleSubmit();
+    });
+
+    async function handleSubmit() {
         const messageContent = messageInput.value.trim();
         if (!messageContent) return;
 
@@ -48,14 +52,17 @@ document.addEventListener('DOMContentLoaded', function() {
         messageInput.style.height = 'auto';
 
         try {
+            // Get current URL with query parameters
+            const url = window.location.href;
+
             // Send message to server
-            const formData = new FormData(messageForm);
-            const response = await fetch(messageForm.action, {
+            const response = await fetch(url, {
                 method: 'POST',
-                body: formData,
                 headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                }
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `message=${encodeURIComponent(messageContent)}`
             });
 
             if (!response.ok) throw new Error('Network response was not ok');
@@ -81,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
             messagesContainer.appendChild(errorMessage);
             scrollToBottom();
         }
-    });
+    }
 
     // Create message element
     function createMessageElement(content, isAi) {

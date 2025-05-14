@@ -83,7 +83,7 @@
 
     <!-- Message Input (Fixed at bottom) -->
     <div class="message-input">
-        <form id="messageForm" class="input-form" method="POST">
+        <form id="messageForm" class="input-form" method="POST" onsubmit="return false;">
             {% csrf_token %}
             <div class="input-wrapper">
                 <textarea id="messageText" name="message"
