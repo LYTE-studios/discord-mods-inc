@@ -183,12 +183,11 @@ setup_ssl() {
     # Get SSL certificate
     if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
         print_status "Obtaining SSL certificate..."
-        EMAIL_ARG="--email ${SSL_EMAIL}"
         certbot --nginx \
             --non-interactive \
             --agree-tos \
-            $EMAIL_ARG \
-            --domains "$DOMAIN" \
+            -m "${SSL_EMAIL}" \
+            -d "${DOMAIN}" \
             --redirect
 
         if [ $? -ne 0 ]; then
