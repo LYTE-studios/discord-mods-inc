@@ -9,7 +9,7 @@ from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 
 
-class ChatListView(LoginRequiredMixin, TemplateView):
+class ChatListView(LoginRequiredMixin, View):
     """
     View for displaying the chat list page and handling new messages.
     """

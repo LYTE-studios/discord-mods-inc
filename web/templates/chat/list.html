@@ -39,7 +39,11 @@
     <!-- Main Content -->
     <main class="main-content">
         <div class="content-header">
-            <h2>{% if current_chat_type == 'cto' %}CTO Chat{% else %}Developer Chat{% endif %}</h2>
+            <div class="header-info">
+                <h2>{% if current_chat_type == 'cto' %}CTO Chat{% else %}Developer Chat{% endif %}</h2>
+                <p class="header-description">Chat directly with the {% if current_chat_type == 'cto' %}CTO{% else
+                    %}Development Team{% endif %}</p>
+            </div>
         </div>
 
         <!-- Message History -->
@@ -63,7 +67,13 @@
             {% endfor %}
             {% else %}
             <div class="no-messages">
-                <p>No messages yet.</p>
+                <div class="no-messages-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </div>
+                <p>No messages yet</p>
                 <p>Start a conversation below!</p>
             </div>
             {% endif %}
@@ -71,10 +81,11 @@
 
         <!-- Message Input -->
         <div class="message-input">
-            <form id="messageForm" class="input-form" method="POST" action="{% url 'chat:chat_room' %}">
+            <form id="messageForm" class="input-form" method="POST">
                 {% csrf_token %}
                 <div class="input-wrapper">
-                    <textarea id="messageText" name="message" placeholder="Message {{ current_chat_type|upper }}..."
+                    <textarea id="messageText" name="message"
+                        placeholder="Message {{ current_chat_type|upper }}... (Press Enter to send)"
                         rows="1"></textarea>
                     <button type="submit" class="btn-send">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
@@ -185,10 +196,16 @@
         background-color: #ffffff;
     }
 
-    .content-header h2 {
+    .header-info h2 {
         margin: 0;
         font-size: 1.25rem;
         color: #1f2937;
+    }
+
+    .header-description {
+        margin: 0.25rem 0 0;
+        font-size: 0.875rem;
+        color: #64748b;
     }
 
     .messages-container {
@@ -197,6 +214,7 @@
         overflow-y: auto;
         display: flex;
         flex-direction: column;
+        background-color: #ffffff;
     }
 
     .message {
@@ -204,15 +222,29 @@
         padding: 0.75rem 1rem;
         border-radius: 0.5rem;
         max-width: 80%;
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     .message-user {
-        background-color: #f3f4f6;
+        background-color: #5865f2;
+        color: white;
         align-self: flex-end;
     }
 
     .message-ai {
-        background-color: #f0f9ff;
+        background-color: #f3f4f6;
         align-self: flex-start;
     }
 
@@ -221,21 +253,19 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: 0.5rem;
-    }
-
-    .message-author {
-        font-weight: 600;
-        color: #1f2937;
-    }
-
-    .message-time {
         font-size: 0.875rem;
+    }
+
+    .message-user .message-header {
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    .message-ai .message-header {
         color: #64748b;
     }
 
     .message-content {
         line-height: 1.5;
-        color: #1f2937;
         word-wrap: break-word;
     }
 
@@ -245,7 +275,12 @@
         color: #64748b;
     }
 
-    .no-messages p:first-child {
+    .no-messages-icon {
+        margin-bottom: 1rem;
+        color: #d1d5db;
+    }
+
+    .no-messages p:first-of-type {
         font-size: 1.25rem;
         font-weight: bold;
         margin-bottom: 0.5rem;
@@ -263,9 +298,14 @@
         align-items: flex-end;
         gap: 0.5rem;
         background: #f3f4f6;
-        border: 1px solid #e5e7eb;
+        border: 2px solid transparent;
         border-radius: 0.5rem;
         padding: 0.5rem;
+        transition: border-color 0.2s;
+    }
+
+    .input-wrapper:focus-within {
+        border-color: #5865f2;
     }
 
     #messageText {
@@ -286,12 +326,13 @@
         border: none;
         padding: 0.5rem;
         cursor: pointer;
-        color: var(--primary-color);
-        transition: color 0.2s;
+        color: #5865f2;
+        transition: color 0.2s, transform 0.2s;
     }
 
     .btn-send:hover {
-        color: var(--secondary-color);
+        color: #4752c4;
+        transform: scale(1.1);
     }
 
     .btn-send svg {
@@ -301,6 +342,6 @@
 </style>
 
 {% block extra_scripts %}
-<script src="/static/js/menu.js"></script>
+<script src="/static/js/chat.js"></script>
 {% endblock %}
 {% endblock %}
