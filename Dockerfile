@@ -33,7 +33,8 @@ RUN apt-get update \
         libpq5 \
         gosu \
         netcat-openbsd \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir gunicorn
 
 # Create app user
 RUN addgroup --system web \
@@ -75,4 +76,5 @@ CMD ["gunicorn", "--bind", "0.0.0.0:8000", \
      "--keepalive", "32", \
      "--max-requests", "1000", \
      "--max-requests-jitter", "50", \
+     "--chdir", "/app", \
      "web.config.wsgi:application"]

@@ -49,11 +49,14 @@ wait_for_redis
 
 # Create necessary directories
 mkdir -p /app/web/{staticfiles,media}
+chmod -R 777 /app/web/{staticfiles,media}
+
+cd /app || exit 1
 
 # Run database migrations with retry
 echo "Running database migrations..."
 for i in $(seq 1 5); do
-    if python manage.py migrate --noinput; then
+    if python web/manage.py migrate --noinput; then
         break
     fi
     if [ $i -eq 5 ]; then
@@ -66,11 +69,17 @@ done
 
 # Collect static files
 echo "Collecting static files..."
-python manage.py collectstatic --noinput
+if ! python web/manage.py collectstatic --noinput; then
+    echo "Error: Failed to collect static files"
+    exit 1
+fi
 
 # Create cache table
 echo "Creating cache table..."
-python manage.py createcachetable
+if ! python web/manage.py createcachetable; then
+    echo "Error: Failed to create cache table"
+    exit 1
+fi
 
 echo "Starting Gunicorn..."
 exec "$@"
