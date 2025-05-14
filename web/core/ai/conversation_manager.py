@@ -235,5 +235,33 @@ class ConversationManager:
             personality_type = self.conversations[conversation_id].personality_type
             self.conversations[conversation_id] = Conversation(personality_type)
 
+    def generate_response(
+        self,
+        message: str,
+        chat_type: str
+    ) -> str:
+        """Synchronous method to generate a response"""
+        try:
+            personality_type = PersonalityType.CTO if chat_type == 'cto' else PersonalityType.DEVELOPER
+            conversation = Conversation(personality_type)
+            conversation.add_message("user", message)
+            
+            response = openai.ChatCompletion.create(
+                model=settings.OPENAI_MODEL,
+                messages=conversation.get_messages(),
+                temperature=0.7,
+                max_tokens=settings.OPENAI_MAX_TOKENS,
+                n=1,
+                presence_penalty=0.6,
+                frequency_penalty=0.0,
+            )
+            
+            ai_message = response.choices[0].message.content
+            return ai_message
+
+        except Exception as e:
+            logger.error(f"Error generating response: {str(e)}")
+            return "I apologize, but I'm having trouble processing your request right now."
+
 # Global instance
 conversation_manager = ConversationManager()
