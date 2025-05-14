@@ -29,6 +29,19 @@ cleanup() {
 # Set up trap for cleanup
 trap cleanup EXIT
 
+# Function to print status messages
+print_status() {
+    echo "${GREEN}[+] $1${NC}"
+}
+
+print_warning() {
+    echo "${YELLOW}[!] $1${NC}"
+}
+
+print_error() {
+    echo "${RED}[-] $1${NC}"
+}
+
 # Check for required tools
 check_requirements() {
     # Check Docker
@@ -56,17 +69,55 @@ check_requirements() {
     fi
 }
 
-# Function to print status messages
-print_status() {
-    echo "${GREEN}[+] $1${NC}"
-}
+# Generate and validate environment file
+setup_env() {
+    if [ ! -f .env ]; then
+        print_status "Generating environment file..."
+        # Generate secrets
+        DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
+        JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
+        ENCRYPTION_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+        
+        cat > .env << EOL
+# Web Configuration
+DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+DJANGO_DEBUG=False
+ALLOWED_HOSTS=gideon.lytestudios.be
+DOMAIN=gideon.lytestudios.be
 
-print_warning() {
-    echo "${YELLOW}[!] $1${NC}"
-}
+# Redis settings (required)
+REDIS_HOST=redis
+REDIS_PORT=6379
 
-print_error() {
-    echo "${RED}[-] $1${NC}"
+# SSL settings
+SSL_EMAIL=admin@lytestudios.be
+
+# Security settings
+JWT_SECRET_KEY=${JWT_SECRET_KEY}
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
+EOL
+        chmod 600 .env
+    fi
+
+    # Validate required environment variables
+    print_status "Validating environment variables..."
+    required_vars=("DJANGO_SECRET_KEY" "ALLOWED_HOSTS" "REDIS_HOST" "REDIS_PORT")
+    missing_vars=()
+    
+    while IFS= read -r line; do
+        if [[ $line =~ ^[^#]*= ]]; then
+            key=$(echo "$line" | cut -d'=' -f1)
+            value=$(echo "$line" | cut -d'=' -f2-)
+            if [[ " ${required_vars[@]} " =~ " ${key} " ]] && [[ -z "$value" ]]; then
+                missing_vars+=("$key")
+            fi
+        fi
+    done < .env
+
+    if [ ${#missing_vars[@]} -ne 0 ]; then
+        print_error "Missing required environment variables: ${missing_vars[*]}"
+        exit 1
+    fi
 }
 
 # Set up error handling
