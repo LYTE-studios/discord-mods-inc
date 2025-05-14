@@ -16,7 +16,8 @@ RUN mkdir -p /var/log/nginx \
             /var/cache/nginx/proxy_temp \
             /var/cache/nginx/fastcgi_temp \
             /var/cache/nginx/uwsgi_temp \
-            /var/cache/nginx/scgi_temp && \
+            /var/cache/nginx/scgi_temp \
+            /var/run && \
     chown -R nginx:nginx /var/log/nginx \
                         /app \
                         /var/cache/nginx \
@@ -24,7 +25,8 @@ RUN mkdir -p /var/log/nginx \
                         /var/cache/nginx/proxy_temp \
                         /var/cache/nginx/fastcgi_temp \
                         /var/cache/nginx/uwsgi_temp \
-                        /var/cache/nginx/scgi_temp && \
+                        /var/cache/nginx/scgi_temp \
+                        /var/run && \
     chmod -R 755 /app/web/staticfiles \
                  /app/web/media \
                  /var/cache/nginx \
@@ -32,7 +34,8 @@ RUN mkdir -p /var/log/nginx \
                  /var/cache/nginx/proxy_temp \
                  /var/cache/nginx/fastcgi_temp \
                  /var/cache/nginx/uwsgi_temp \
-                 /var/cache/nginx/scgi_temp
+                 /var/cache/nginx/scgi_temp \
+                 /var/run
 
 # Copy custom nginx config
 COPY --chown=nginx:nginx default.conf /etc/nginx/conf.d/
@@ -43,6 +46,12 @@ HEALTHCHECK --interval=30s --timeout=3s \
 
 # Expose ports
 EXPOSE 80 443
+
+# Update nginx config to use pid file in writable directory
+RUN sed -i 's#pid /var/run/nginx.pid;#pid /var/run/nginx.pid;#g' /etc/nginx/nginx.conf && \
+    touch /var/run/nginx.pid && \
+    chown nginx:nginx /var/run/nginx.pid && \
+    chmod 644 /var/run/nginx.pid
 
 # Switch to non-root user
 USER nginx
