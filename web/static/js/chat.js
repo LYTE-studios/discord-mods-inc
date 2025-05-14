@@ -66,11 +66,12 @@ document.addEventListener('DOMContentLoaded', function() {
             loadingMessage.remove();
 
             // Add AI response
-            if (data.conversation.messages.length > 1) {
-                const aiMessage = data.conversation.messages[1];
-                const aiMessageElement = createMessageElement(aiMessage.content, true);
+            if (data.status === 'success' && data.message) {
+                const aiMessageElement = createMessageElement(data.message.content, true);
                 messagesContainer.appendChild(aiMessageElement);
                 scrollToBottom();
+            } else {
+                throw new Error('Invalid response format');
             }
         } catch (error) {
             console.error('Error:', error);

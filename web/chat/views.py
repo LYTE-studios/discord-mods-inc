@@ -5,8 +5,12 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
+from datetime import datetime
+import logging
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class ChatListView(LoginRequiredMixin, View):
@@ -34,55 +38,33 @@ class ChatListView(LoginRequiredMixin, View):
         chat_type = request.GET.get('type', 'cto')
         message_content = request.POST.get('message')
 
-        if message_content:
-            # Create a new conversation
-            conversation = Conversation.objects.create(
-                user=request.user,
-                chat_type=chat_type,
-                title=f"Chat with {chat_type.upper()}"
-            )
+        if not message_content:
+            return JsonResponse({'status': 'error', 'message': 'No message content provided'}, status=400)
 
-            # Create the user message
-            Message.objects.create(
-                conversation=conversation,
-                user=request.user,
-                content=message_content,
-                is_ai=False
-            )
-
+        try:
             # Generate AI response
-            from web.core.ai.conversation_manager import ConversationManager
-            conversation_manager = ConversationManager()
+            from web.core.ai.conversation_manager import conversation_manager
             ai_response = conversation_manager.generate_response(
                 message_content,
                 chat_type
             )
 
-            # Create the AI message with the same user (for DB constraint)
-            Message.objects.create(
-                conversation=conversation,
-                user=request.user,  # Use the same user for AI messages
-                content=ai_response,
-                is_ai=True
-            )
-
-            # Return JSON response with conversation data
+            # Return just the AI response
             return JsonResponse({
                 'status': 'success',
-                'conversation': {
-                    'id': conversation.id,
-                    'messages': [
-                        {
-                            'content': msg.content,
-                            'is_ai': msg.is_ai,
-                            'created_at': msg.created_at.strftime('%H:%M')
-                        }
-                        for msg in conversation.messages.all()
-                    ]
+                'message': {
+                    'content': ai_response,
+                    'is_ai': True,
+                    'created_at': datetime.now().strftime('%H:%M')
                 }
             })
 
-        return JsonResponse({'status': 'error', 'message': 'No message content provided'}, status=400)
+        except Exception as e:
+            logger.error(f"Error in chat post: {str(e)}")
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to process message. Please try again.'
+            }, status=500)
 
 
 class ChatRoomView(LoginRequiredMixin, TemplateView):
